@@ -4,8 +4,11 @@
 #include <string.h>
 #include <ctype.h>
 #include <time.h>  
+#include <unistd.h>
+#include <pthread.h>
 
 #define RESET_ALL "\033[0m"
+#define BUFFER_SIZE 4096
 
 /* List of colors */
 
@@ -26,6 +29,9 @@
 #define ITALIC "\033[3m"
 #define UNDERLINE "\033[4m"
 #define STRIKETHROUGH "\033[9m" 
+/*
+    clear everything on the console
+*/
 #define CLEAR_SCREEN "\033[H\033[J"
 
 void greeting(char[]);

@@ -29,11 +29,18 @@ void greeting(char intro[]) {
 }
 
 void spawn_terminal(){
-    char intro[] = "Welcome to Mogwarts University";
-    greeting(intro);
+    do{
+        char* buffer = (char*)malloc(BUFFER_SIZE);
+        printf("Enter an input: ");
+        scanf("%s", buffer);
+        printf("Input: %s\n", buffer);
+        free(buffer);
+    }while(1);
 }
 
 int main(int argc, char* argv[]){
+    char intro[] = "Welcome to Mogwarts University";
+    greeting(intro);
     spawn_terminal();
     return 0;
 }
