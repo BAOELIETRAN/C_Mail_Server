@@ -32,7 +32,10 @@ void spawn_terminal(){
     do{
         char* buffer = (char*)malloc(BUFFER_SIZE);
         printf("Enter an input: ");
-        scanf("%s", buffer);
+        if (scanf("%s", buffer) != 1){
+            perror("Failed to read the input string!");
+            exit(EXIT_FAILURE);
+        }
         printf("Input: %s\n", buffer);
         free(buffer);
     }while(1);

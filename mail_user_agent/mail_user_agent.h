@@ -7,6 +7,8 @@
 #include <unistd.h>
 #include <pthread.h>
 
+#pragma once
+
 #define RESET_ALL "\033[0m"
 #define BUFFER_SIZE 4096
 
