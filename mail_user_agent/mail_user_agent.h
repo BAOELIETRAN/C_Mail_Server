@@ -6,6 +6,7 @@
 #include <time.h>  
 #include <unistd.h>
 #include <pthread.h>
+#include <errno.h>
 
 #pragma once
 
@@ -36,6 +37,31 @@
 */
 #define CLEAR_SCREEN "\033[H\033[J"
 
+/*
+    define an email
+    Two components of an email:
+    1. Header
+        a. title of the email
+        b. sender of that email
+        c. receiver of that email
+    2. Mail content
+        a. content of that email
+*/
+typedef struct{
+    struct Header{
+        char* title;
+        char* sender;
+        char* receiver;
+    }; 
+    struct Header header;
+    struct Mail_Content{
+        char* content;
+    };
+    struct Mail_Content mail_content;
+} Mail;
+
+Mail* create_email(char*, char*, char*, char*);
+void free_email(Mail*);
 void greeting(char[]);
 void spawn_terminal();
 int main(int, char*[]);

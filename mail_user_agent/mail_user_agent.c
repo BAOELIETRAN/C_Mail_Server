@@ -1,5 +1,46 @@
 #include "mail_user_agent.h"
 
+/*
+    Need to allocate memories for the strings inside each struct
+    Since they are stored by reference
+*/
+Mail* create_email(char* title, char* sender, char* receiver, char* content){
+    Mail* email = (Mail*)malloc(sizeof(Mail));
+    if (email == NULL){
+        printf("Value of errno: %d\n", errno);
+        perror("Error message in create_email():");
+        exit(EXIT_FAILURE);
+    }
+    email->header.title = strdup(title);
+    email->header.sender = strdup(sender);
+    email->header.receiver = strdup(receiver);
+    email->mail_content.content = strdup(content);
+    if (!email->header.title || !email->header.sender || !email->header.receiver || !email->mail_content.content){
+        free(email->header.title);
+        free(email->header.sender);
+        free(email->header.receiver);
+        free(email->mail_content.content);
+        free(email);
+        printf("Value of errno: %d\n", errno);
+        perror("Error message in create_email() - content:");
+        exit(EXIT_FAILURE);
+    }
+    return email;
+}
+
+/*
+    free the email after done using
+*/
+void free_email(Mail* email){
+    if (email){
+        free(email->header.title);
+        free(email->header.sender);
+        free(email->header.receiver);
+        free(email->mail_content.content);
+        free(email);
+    }
+}
+
 void greeting(char intro[]) {
     int len = strlen(intro);
     int index = 0;
