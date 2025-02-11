@@ -60,6 +60,41 @@ typedef struct{
     struct Mail_Content mail_content;
 } Mail;
 
+/*
+    MIME header struct
+    this is a simplified version of mime header
+    there are other fields to implement:
+        Content-Transfer-Encoding
+        Content-Disposition
+        Boundary (for multipart)
+    Due to its complexity and the email is expected
+    to be plain text, it is not currently used now
+*/
+typedef struct{
+    /*
+        whether the mail follows MIME standard or not
+    */
+    bool mime_stad;
+    /*
+        define the type of content    
+    */
+    char* content_type;
+} MIME;
+
+
+/*
+    Data structure:
+        Send array - keep sending email
+            need an index to keep track the current position
+        Recv array - keep receiving email
+            need an index to keep track the current position
+*/
+int cur_send_index;
+int cur_recv_index;
+Mail** send_arr;
+Mail** recv_arr;
+
+
 Mail* create_email(char*, char*, char*, char*);
 void free_email(Mail*);
 void greeting(char[]);

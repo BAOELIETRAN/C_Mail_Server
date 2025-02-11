@@ -1,6 +1,16 @@
 #include "mail_user_agent.h"
 
 /*
+    @todo:
+    function for casting input from the user 
+    --> create an email with that information
+    create sockets, both for recv and send
+    send an email --> record that into array
+    receive an email --> record that into array
+    FINAL: terminal
+*/
+
+/*
     Need to allocate memories for the strings inside each struct
     Since they are stored by reference
 */
@@ -39,6 +49,30 @@ void free_email(Mail* email){
         free(email->mail_content.content);
         free(email);
     }
+}
+
+void init_arrs(){
+    cur_send_index = 0;
+    cur_recv_index = 0;
+    send_arr = (Mail**)malloc(BUFFER_SIZE * sizeof(Mail*));
+    if (send_arr == NULL){
+        printf("Value of errno: %d\n", errno);
+        perror("Error message from init_arrs() - send_arr:");
+        exit(EXIT_FAILURE);
+    }
+    recv_arr = (Mail**)malloc(BUFFER_SIZE * sizeof(Mail*));
+    if (recv_arr == NULL){
+        printf("Value of errno: %d\n", errno);
+        perror("Error message from init_arrs() - recv_arr:");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void free_arrs(){
+    cur_recv_index = 0;
+    cur_send_index = 0;
+    free(send_arr);
+    free(recv_arr);
 }
 
 void greeting(char intro[]) {
