@@ -1,3 +1,13 @@
+/*
+Each version of a standard (like POSIX or X/Open) 
+defines a set of functions, symbols, and behaviors that 
+should be available in your program. The feature test macro 
+makes sure that only the functions and features from the 
+specified version are available.
+*/
+
+#define _XOPEN_SOURCE 500
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -10,6 +20,7 @@
 
 #pragma once
 
+#define TEMPLATE_FILE "template.txt"
 #define RESET_ALL "\033[0m"
 #define BUFFER_SIZE 4096
 
