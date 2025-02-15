@@ -20,28 +20,38 @@ int mail_counting = 0;
 /*
     Need to allocate memories for the strings inside each struct
     Since they are stored by reference
+    @attention: No need to create pointers for mail_content and header structs 
+                since they are part of the Mail struct and allocated together.
+    Update: copy src -> dst, copy len - 1 byte, assign the last byte to be null
+    strcpy:
+        Copies a string without checking the destination buffer size.
+        Stops copying at the null terminator (\0).
+        Risk: If the destination buffer is too small, it leads to buffer overflows.
+    strncpy: 
+        Copies up to n characters, even if the source string is shorter.
+        If the source string is smaller than n, it fills the remaining space with garbage 
+        (before C99) or zeros (after C99).
+        If the source string is longer than n, it does not add a null terminator (\0).
 */
-Mail* create_email(char* title, char* sender, char* receiver, char* content){
+Mail* create_email(char* title, char* sender, char* receiver, char* content) {
     Mail* email = (Mail*)malloc(sizeof(Mail));
-    if (email == NULL){
-        printf("Value of errno: %d\n", errno);
-        perror("Error message in create_email():");
+    if (email == NULL) {
+        perror("Error allocating memory for Mail");
         exit(EXIT_FAILURE);
     }
-    email->header.title = strdup(title);
-    email->header.sender = strdup(sender);
-    email->header.receiver = strdup(receiver);
-    email->mail_content.content = strdup(content);
-    if (!email->header.title || !email->header.sender || !email->header.receiver || !email->mail_content.content){
-        free(email->header.title);
-        free(email->header.sender);
-        free(email->header.receiver);
-        free(email->mail_content.content);
-        free(email);
-        printf("Value of errno: %d\n", errno);
-        perror("Error message in create_email() - content:");
-        exit(EXIT_FAILURE);
-    }
+
+    strncpy(email->header.title, title, MAX_TITLE_LEN - 1);
+    email->header.title[MAX_TITLE_LEN - 1] = '\0';  // Ensure null termination
+
+    strncpy(email->header.sender, sender, MAX_SENDER_LEN - 1);
+    email->header.sender[MAX_SENDER_LEN - 1] = '\0';
+
+    strncpy(email->header.receiver, receiver, MAX_RECEIVER_LEN - 1);
+    email->header.receiver[MAX_RECEIVER_LEN - 1] = '\0';
+
+    strncpy(email->mail_content.content, content, MAX_CONTENT_LEN - 1);
+    email->mail_content.content[MAX_CONTENT_LEN - 1] = '\0';
+
     return email;
 }
 
@@ -50,14 +60,14 @@ Mail* create_email(char* title, char* sender, char* receiver, char* content){
 */
 void free_email(Mail* email){
     if (email){
-        free(email->header.title);
-        free(email->header.sender);
-        free(email->header.receiver);
-        free(email->mail_content.content);
         free(email);
     }
 }
 
+/*
+    if there is no slot left in the array
+    --> increase the size using realloc()
+*/
 void init_arrs(){
     cur_send_index = 0;
     cur_recv_index = 0;
@@ -150,38 +160,117 @@ char* create_and_edit_file(){
         exit(EXIT_FAILURE);
     }
     /*
-        command created a file on disk
-        --> need to rename the file on disk
-        --> cannot use snprintf since the file is not on memory
-        --> use rename() to change the name on the disk
+        @attention: changing and redirecting 
+        the file right now will make us lost track 
+        of the file
+        --> Solution: after creating a file, we will 
+        change the name and redirect it while running the loop in the terminal
     */
-    char new_file_name[256];
-    snprintf(new_file_name, sizeof(new_file_name), "email-%d", mail_counting);
+    // /*
+    //     command created a file on disk
+    //     --> need to rename the file on disk
+    //     --> cannot use snprintf since the file is not on memory
+    //     --> use rename() to change the name on the disk
+    // */
+    // char new_file_name[256];
+    // snprintf(new_file_name, sizeof(new_file_name), "email-%d", mail_counting);
     
-    /*
-        @brief: Rename the file on disk to match the new name
-    */
-    if (rename(file_name, new_file_name) != 0) {
-        perror("Failed to rename the file");
-        free(file_name);
-        exit(EXIT_FAILURE);
-    }
-    /*
-        @brief: redirect email to folder
-        @attention: need to use the new name of the mail
-    */
-    char redirect_command[512];
-    snprintf(redirect_command, sizeof(redirect_command), "mv %s Send_Emails", new_file_name);
-    int system_return_redirect = system(redirect_command);
-    if (system_return_redirect == -1){
-        perror("Can not execute the command - create_and_edit_file()");
-        free(file_name);
-        exit(EXIT_FAILURE);
-    }
-    /*
-        must free after done using the file
-    */
+    // /*
+    //     @brief: Rename the file on disk to match the new name
+    // */
+    // if (rename(file_name, new_file_name) != 0) {
+    //     perror("Failed to rename the file");
+    //     free(file_name);
+    //     exit(EXIT_FAILURE);
+    // }
+    // /*
+    //     @brief: redirect email to folder
+    //     @attention: need to use the new name of the mail
+    // */
+    // char redirect_command[512];
+    // snprintf(redirect_command, sizeof(redirect_command), "mv %s Send_Emails", new_file_name);
+    // int system_return_redirect = system(redirect_command);
+    // if (system_return_redirect == -1){
+    //     perror("Can not execute the command - create_and_edit_file()");
+    //     free(file_name);
+    //     exit(EXIT_FAILURE);
+    // }
+    // /*
+    //     must free after done using the file
+    // */
     return file_name;
+}
+
+/*
+    @attention: the user input and create an email based on that information
+    strcspn --> calculate the length of the initial segment of the string 
+    that does not contain any character from the set 
+    strncmp --> compare N characters of S1 to S2
+    strncat --> safe string concatenation
+    --> append at most n characters from src to dest
+    --> ensure dest remains null-terminated
+*/
+Mail* parse_user_input_and_create_mail(char* file_name){
+    /*
+        typedef struct{
+        struct Header{
+            char* title;
+            char* sender;
+            char* receiver;
+        }; 
+        struct Header header;
+        struct Mail_Content{
+            char* content;
+        };
+        struct Mail_Content mail_content;
+        } Mail;
+    */
+    FILE* file_pointer = fopen(file_name, "r");
+    int index = 0;
+    char title[MAX_TITLE_LEN] = "";
+    char sender[MAX_SENDER_LEN] = "";
+    char receiver[MAX_RECEIVER_LEN] = "";
+    char content[MAX_CONTENT_LEN] = "";
+    char* array[] = {title, sender, receiver, content};
+    /*
+        hold the content of the line
+    */
+    char line[LINE_LENGTH];
+    if (file_pointer == NULL){
+        perror("Error opening file");
+        exit(EXIT_FAILURE);
+    }
+    /*
+        read a line from a file that is pointed to by file_pointer 
+        and store it into line
+    */
+    int content_started = 0;
+    while (fgets(line, LINE_LENGTH, file_pointer) != NULL) { 
+        /*
+            remove new line character from the line
+        */
+        line[strcspn(line, "\n")] = '\0';
+        if (strncmp(line, "TITLE:", 6) == 0){
+            strncpy(title, line + 6, MAX_TITLE_LEN - 1);
+        }
+        else if (strncmp(line, "FROM:", 5) == 0){
+            strncpy(sender, line + 5, MAX_SENDER_LEN - 1);
+        }
+        else if (strncmp(line, "TO:", 3) == 0){
+            strncpy(receiver, line + 3, MAX_RECEIVER_LEN - 1);
+        }
+        else if (strncmp(line, "CONTENT:", 8) == 0){
+            content_started = 1;
+            strncat(content, line + 8, MAX_CONTENT_LEN - strlen(content) - 1);
+        }
+        else if (content_started == 1){
+            strncat(content, "\n", MAX_CONTENT_LEN - strlen(content) - 1);
+            strncat(content, line, MAX_CONTENT_LEN - strlen(content) - 1);
+        }
+    }   
+    fclose(file_pointer);
+    Mail* new_email = create_email(title, sender, receiver, content);
+    return new_email;
 }
 
 void greeting(char intro[]) {
@@ -225,6 +314,16 @@ void spawn_terminal(){
     }while(1);
 }
 
+void print_email(Mail* mail){
+    printf("Header:\n");
+    printf("Title: %s\n", mail->header.title);
+    printf("Sender: %s\n", mail->header.sender);
+    printf("Receiver: %s\n", mail->header.receiver);
+    printf("------------------\n");
+    printf("Mail Content:\n");
+    printf("Content: %s\n", mail->mail_content.content);
+}
+
 int main(int argc, char* argv[]){
     char intro[] = "Welcome to Mogwarts University";
     greeting(intro);
@@ -232,8 +331,11 @@ int main(int argc, char* argv[]){
     char* file_name = create_and_edit_file();
     mail_counting ++;
     if (file_name){
-        printf("Create file successfully!\n");
-        free(file_name);
+        printf("Create file successfully! %s\n", file_name);
     }
+    Mail* new_mail = parse_user_input_and_create_mail(file_name);
+    print_email(new_mail);
+    free(file_name);
+    free(new_mail);
     return 0;
 }

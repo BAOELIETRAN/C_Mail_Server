@@ -24,6 +24,17 @@ specified version are available.
 #define RESET_ALL "\033[0m"
 #define BUFFER_SIZE 4096
 
+#define LINE_LENGTH 1024
+
+/*
+    Email content define
+*/
+#define MAX_TITLE_LEN 100
+#define MAX_SENDER_LEN 100
+#define MAX_RECEIVER_LEN 100
+#define MAX_CONTENT_LEN 1024
+
+
 /* List of colors */
 
 #define BLACK "\033[30m"
@@ -57,16 +68,17 @@ specified version are available.
         c. receiver of that email
     2. Mail content
         a. content of that email
+    Update: Fix the string inside the mail to using array instead of using pointer
 */
 typedef struct{
     struct Header{
-        char* title;
-        char* sender;
-        char* receiver;
+        char title[MAX_TITLE_LEN];
+        char sender[MAX_SENDER_LEN];
+        char receiver[MAX_RECEIVER_LEN];
     }; 
     struct Header header;
     struct Mail_Content{
-        char* content;
+        char content[MAX_CONTENT_LEN];
     };
     struct Mail_Content mail_content;
 } Mail;
@@ -108,6 +120,8 @@ Mail** recv_arr;
 
 Mail* create_email(char*, char*, char*, char*);
 void free_email(Mail*);
+Mail* parse_user_input_and_create_mail(char*);
+void print_email(Mail*);
 void greeting(char[]);
 void spawn_terminal();
 int main(int, char*[]);

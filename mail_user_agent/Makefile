@@ -13,5 +13,5 @@ mail_user_agent.o: $(files)
 	$(CC) $(flags) -c $< -o $@
 
 clean:
-	rm -f *.o mail_user_agent 
+	rm -f *.o mail_user_agent email-*
 
