@@ -23,6 +23,7 @@ specified version are available.
 #define TEMPLATE_FILE "template.txt"
 #define RESET_ALL "\033[0m"
 #define BUFFER_SIZE 4096
+#define MAX_TOKENS 10
 
 #define LINE_LENGTH 1024
 

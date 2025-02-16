@@ -11,6 +11,9 @@ int mail_counting = 0;
     @todo
     create a function to cast information inside the newly created file
     --> create an email with that information
+    @todo
+    done parsing user's input into array of tokens
+    --> read the blue print and do the terminal commands
     create sockets, both for recv and send
     send an email --> record that into array
     receive an email --> record that into array
@@ -32,6 +35,21 @@ int mail_counting = 0;
         If the source string is smaller than n, it fills the remaining space with garbage 
         (before C99) or zeros (after C99).
         If the source string is longer than n, it does not add a null terminator (\0).
+    When copy, we need to ensure that the final byte of the string is null byte.
+    When copying a string from src to dest, we need to ensure that.
+    the null terminator ('\0') of the source string is properly copied as well.
+    strlen(src) does not count the null byte in src.
+    strncpy(dest, src, n_bytes);
+    if len(src) < n --> copy the entire string including the null byte.
+    if len(src) > n --> copy the n characters of src and not adding null byte to dest
+    Ex: len(src) < len(dest)
+        char src[] = "Hello";
+        char dest[10];
+        strncpy(dest, src, 10);  // dest will be "Hello\0\0\0\0\0"
+    Ex: len(src) > len(dest)
+        char src[] = "HelloWorld";
+        char dest[5];
+        strncpy(dest, src, 5);  // dest will be "Hello", but NOT null-terminated    
 */
 Mail* create_email(char* title, char* sender, char* receiver, char* content) {
     Mail* email = (Mail*)malloc(sizeof(Mail));
@@ -206,9 +224,11 @@ char* create_and_edit_file(){
     strcspn --> calculate the length of the initial segment of the string 
     that does not contain any character from the set 
     strncmp --> compare N characters of S1 to S2
+    strncmp will stop comparing when it hits the null byte or source or destination
     strncat --> safe string concatenation
     --> append at most n characters from src to dest
     --> ensure dest remains null-terminated
+    --> if the length of the source string exceeds the remaining space --> overflow
 */
 Mail* parse_user_input_and_create_mail(char* file_name){
     /*
@@ -302,14 +322,80 @@ void greeting(char intro[]) {
 }
 
 void spawn_terminal(){
+    /*
+        receive the input --> turn that input into array of arguments
+        --> if len >= 3 --> continue to the next prompt
+        --> if the first argument != allowed ones --> continue to next prompt
+        --> if == --> process the next argument (dependently)
+    */
     do{
         char* buffer = (char*)malloc(BUFFER_SIZE);
-        printf("Enter an input: ");
-        if (scanf("%s", buffer) != 1){
-            perror("Failed to read the input string!");
+        if (buffer == NULL){
+            perror("Failed to allocate buffer!");
             exit(EXIT_FAILURE);
         }
-        printf("Input: %s\n", buffer);
+        printf("Enter an input: ");
+        /*
+            fgets reads full line of text
+            fgets will store the \n when user presses enter --> need to remove it
+            scanf reads until whitespace
+        */
+        if (fgets(buffer, BUFFER_SIZE, stdin) == NULL){
+            perror("Failed to read the input string!");
+            free(buffer);
+            exit(EXIT_FAILURE);
+        }
+        buffer[strcspn(buffer, "\n")] = '\0';
+        /*
+            tokens will store the list of addresses of the first character
+            of tokens
+        */
+        char* tokens[MAX_TOKENS];
+        int token_count = 0;
+        char* pointer = buffer;
+        /*
+            in the loop, *pointer will return false if *pointer = \0
+            (reach to the end of the string)
+        */
+        while (*pointer && token_count < MAX_TOKENS){
+            /*
+                skip the whitespaces
+                char can contains negative value, but isspace accepts positive 
+                --> cast char to unsigned char
+            */
+            while (isspace((unsigned char)*pointer)){
+                pointer ++;
+            }
+            if (*pointer == '\0'){
+                break;
+            }
+            if (*pointer == '"'){
+                pointer ++;     //skip the opening quote
+                tokens[token_count++] = pointer;
+                while (*pointer && *pointer != '"'){
+                    pointer ++;
+                }
+                if (*pointer == '"'){
+                    *pointer++ = '\0';
+                }
+            }
+            else{
+                tokens[token_count++] = pointer;
+                while (*pointer && !isspace((unsigned char)*pointer)){
+                    pointer ++;
+                }
+                if (*pointer){
+                    *pointer++ = '\0';
+                }
+            }
+        }
+        for (int i = 0; i < token_count; i ++){
+            printf("Token %d: %s\n", i + 1, tokens[i]);
+        }
+        if (token_count >= 3){
+            printf("There are too many arguments, the maximum is 2\n");
+            continue;
+        }
         free(buffer);
     }while(1);
 }
@@ -327,15 +413,15 @@ void print_email(Mail* mail){
 int main(int argc, char* argv[]){
     char intro[] = "Welcome to Mogwarts University";
     greeting(intro);
-    // spawn_terminal();
-    char* file_name = create_and_edit_file();
-    mail_counting ++;
-    if (file_name){
-        printf("Create file successfully! %s\n", file_name);
-    }
-    Mail* new_mail = parse_user_input_and_create_mail(file_name);
-    print_email(new_mail);
-    free(file_name);
-    free(new_mail);
+    spawn_terminal();
+    // char* file_name = create_and_edit_file();
+    // mail_counting ++;
+    // if (file_name){
+    //     printf("Create file successfully! %s\n", file_name);
+    // }
+    // Mail* new_mail = parse_user_input_and_create_mail(file_name);
+    // print_email(new_mail);
+    // free(file_name);
+    // free_email(new_mail);
     return 0;
 }
