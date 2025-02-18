@@ -1,5 +1,5 @@
 files := mail_user_agent.c mail_user_agent.h
-flags := -O2 -std=c2x
+flags := -g -O2 -std=c2x
 CC := gcc
 
 .PHONY = all clean

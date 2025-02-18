@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# Find all executable files in the current directory (excluding directories)
+executables=()
+while IFS= read -r file; do
+    executables+=("$file")
+done < <(find . -maxdepth 1 -type f -executable)
+
+# Check if we found any executable files
+if [ ${#executables[@]} -eq 0 ]; then
+    echo "No executable files found in the current directory."
+    exit 1
+elif [ ${#executables[@]} -eq 1 ]; then
+    exe_file="${executables[0]}"
+else
+    echo "Multiple executable files found:"
+    select exe_file in "${executables[@]}"; do
+        if [ -n "$exe_file" ]; then
+            break
+        else
+            echo "Invalid selection. Try again."
+        fi
+    done
+fi
+
+# Run gdb on the selected executable
+echo "Running gdb on $exe_file..."
+gdb "$exe_file"
