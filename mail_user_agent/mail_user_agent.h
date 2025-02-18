@@ -105,6 +105,10 @@ typedef struct{
     char* content_type;
 } MIME;
 
+/*
+    draft email to store the newly created email
+*/
+Mail* draft_email;
 
 /*
     Data structure:
@@ -123,6 +127,7 @@ Mail* create_email(char*, char*, char*, char*);
 void free_email(Mail*);
 Mail* parse_user_input_and_create_mail(char*);
 void print_email(Mail*);
+void lower_the_string(char*);
 void greeting(char[]);
 void spawn_terminal();
 int main(int, char*[]);

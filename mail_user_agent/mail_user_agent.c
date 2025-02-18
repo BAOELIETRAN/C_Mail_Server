@@ -4,7 +4,22 @@
     counting the order of sending mails
 */
 int mail_counting = 0;
+
 /*
+    17/2/2025:
+    DONE: 
+        Create some commands in terminal:
+        - Lowercase the tokens
+        - list + (send/receive) --> list email
+        - make mail --> create draft email
+        - draft status/ delete/ print
+        - send mail --> send mail
+    TODO: 
+        - Create socket to connect to MSA for sending email
+        - Create socket to connect to MDA for receiving email
+        --> Implementing get email command
+        - Implementing search command
+
     @todo:
     function for taking input from the user 
     --> create_and_edit_file() --> return a file with input inside
@@ -13,6 +28,9 @@ int mail_counting = 0;
     --> create an email with that information
     @todo
     done parsing user's input into array of tokens
+    Since the tokens array only contains the address of the first 
+    character of the string --> need to gather the characters until \0
+    to have the full token
     --> read the blue print and do the terminal commands
     create sockets, both for recv and send
     send an email --> record that into array
@@ -103,12 +121,35 @@ void init_arrs(){
     }
 }
 
-void free_arrs(){
+void free_arrs() {
+    /*
+        Free every email in the array and then free the array itself
+    */
+    for (int i = 0; i < cur_send_index; i++) {
+        if (send_arr[i]) {  
+            // Free dynamically allocated fields inside Mail (if any)
+            free(send_arr[i]);  
+        }
+    }
+    for (int i = 0; i < cur_recv_index; i++) {
+        if (recv_arr[i]) {  
+            free(recv_arr[i]);  
+        }
+    }
+    
+    // Reset indices
     cur_recv_index = 0;
     cur_send_index = 0;
+
+    // Free arrays only if dynamically allocated
     free(send_arr);
     free(recv_arr);
+    
+    // Prevent dangling pointer issues
+    send_arr = NULL;
+    recv_arr = NULL;
 }
+
 
 /*
     Function to create a file, open it in an editor, and return the filename
@@ -321,6 +362,18 @@ void greeting(char intro[]) {
     printf("\n");
 }
 
+/*
+    @brief:
+    --> turn the string in the memory to lowercase
+*/
+void lower_the_string(char* string){
+    char* pointer = string;
+    while(*pointer){
+        *pointer = tolower((unsigned char)*pointer);
+        pointer ++;
+    }
+}
+
 void spawn_terminal(){
     /*
         receive the input --> turn that input into array of arguments
@@ -389,11 +442,194 @@ void spawn_terminal(){
                 }
             }
         }
+        /*
+            Lowering every token and print them out
+        */
         for (int i = 0; i < token_count; i ++){
+            lower_the_string(tokens[i]);
             printf("Token %d: %s\n", i + 1, tokens[i]);
         }
+        if (token_count > 0 && strcmp(tokens[0], "exit") == 0) {
+            break;
+        }
+        /*
+            Standard: 2 arguments
+        */
         if (token_count >= 3){
             printf("There are too many arguments, the maximum is 2\n");
+            continue;
+        }
+        if (token_count < 2){
+            printf("There are too few arguments, the minimum is 2\n");
+            continue;
+        }
+
+        char* first_token = tokens[0];
+        char* second_token = tokens[1];
+        /*
+            @brief: 
+            list: list email from the storage (arrays)
+            --> list send --> list sent email from send array
+            --> list receive --> list receive email from receive array 
+        */
+        if (strcmp(first_token, "list") == 0){
+            if (strcmp(second_token, "send") == 0){
+                if (cur_send_index == 0){
+                    printf("The SEND mail box is currently empty, add some!\n");
+                    continue;
+                }
+                else{
+                    for (int i = 0; i < cur_send_index; i ++){
+                        Mail* cur_mail = send_arr[i];
+                        print_email(cur_mail);
+                    }
+                }
+            }
+            else if (strcmp(second_token, "receive") == 0){
+                if (cur_recv_index == 0){
+                    printf("The RECEIVE mail box is currently empty, add some!\n");
+                    continue;
+                }
+                else{
+                    for (int i = 0; i < cur_recv_index; i ++){
+                        Mail* cur_mail = recv_arr[i];
+                        print_email(cur_mail);
+                    }
+                }
+            }
+            else{
+                printf("The command is not correct, try again!\n");
+                continue;
+            }
+        }
+        /*
+            @brief: 
+            --> make: let the user make an email and create an email
+            --> make mail
+        */
+        else if (strcmp(first_token, "make") == 0){
+            if (strcmp(second_token, "mail") == 0){
+                char* file_name = create_and_edit_file();
+                mail_counting ++;
+                if (file_name == NULL){
+                    perror("Allocate file for email unsuccessfully");
+                    exit(EXIT_FAILURE);
+                }
+                printf("Create file successfully! %s\n", file_name);
+                draft_email = parse_user_input_and_create_mail(file_name);
+                if (draft_email == NULL){
+                    perror("Can not create email");
+                    exit(EXIT_FAILURE);
+                }
+                // print_email(draft_email);
+                free(file_name);
+                // free_email(draft_email);
+            }
+            else{
+                printf("The command is not correct, try again!\n");
+                continue;
+            }
+        }
+        /*
+            @brief: 
+            Since we create an email --> we will create a draft email
+            --> we need to check whether the draft email exist
+            --> if no: tell the user to create an email --> continue
+            --> if yes: send or delete
+            Additional command --> print draft email
+        */
+        else if (strcmp(first_token, "draft") == 0){
+            if (strcmp(second_token, "status") == 0){
+                if (draft_email == NULL){
+                    printf("There is no draft email. Create one!\n");
+                    continue;
+                }   
+                else{
+                    printf("There is a draft email. Send or Delete?\n");
+                }
+            }
+            else if (strcmp(second_token, "print") == 0){
+                if (draft_email == NULL){
+                    printf("There is no draft email to print. Create one!\n");
+                    continue;
+                }   
+                else{
+                    print_email(draft_email);
+                }
+            }   
+            else if (strcmp(second_token, "delete") == 0){
+                if (draft_email == NULL){
+                    printf("There is no draft email to delete!\n");
+                    continue;
+                }   
+                else{
+                    free_email(draft_email);
+                    /*
+                        uninitialized pointers can hold garbage values
+                        --> it is good to assign NULL to freed pointer
+                    */
+                    draft_email = NULL;
+                    printf("Delete the draft email successfully!\n");
+                }
+            }
+            else{
+                printf("The command is not correct, try again!\n");
+                continue;
+            }
+        }
+        else if (strcmp(first_token, "send") == 0){
+            if (strcmp(second_token, "email") == 0){
+                /*
+                    @todo: 
+                    create a socket to connect to MSA 
+                    --> send the draft email through the socket
+                    Currently we assume that the email has been sent to MSA
+                    --> add the draft email to send array
+                    --> increase the send index
+                    --> if the array is out of space --> realloc
+                    --> free the draft email
+                */
+                send_arr[cur_send_index] = draft_email;
+                cur_send_index ++;
+                // If cur_send_index is greater than or equal to BUFFER_SIZE, we need to reallocate
+                if (cur_send_index >= BUFFER_SIZE) {
+                    send_arr = (Mail**)realloc(send_arr, 2 * BUFFER_SIZE * sizeof(Mail*));
+                    if (send_arr == NULL) {
+                        perror("Allocate memory for send array unsuccessfully");
+                        exit(EXIT_FAILURE);
+                    }
+                }
+                free(draft_email);
+                draft_email = NULL;
+                printf("Delete the draft email successfully!\n");
+            }
+            else{
+                printf("The command is not correct, try again!\n");
+                continue;
+            }
+        }
+        /*
+            @brief:  
+            get the email from the MDA server
+            --> need to create socket to connect to MDA
+            After getting the email, put that into the receive array list
+        */
+        else if (strcmp(first_token, "get") == 0){
+            if (strcmp(second_token, "mail") == 0){
+                printf("Wait, implement later!\n");
+                continue;
+            }
+            else{
+                printf("The command is not correct, try again!\n");
+                continue;
+            }
+        }
+        /*
+            @brief: 
+            search for keyword in the mail array
+        */
+        else if (strcmp(first_token, "search") == 0){
+            printf("Wait, implement later!\n");
             continue;
         }
         free(buffer);
@@ -401,6 +637,7 @@ void spawn_terminal(){
 }
 
 void print_email(Mail* mail){
+    printf("---------------------START---------------------------\n");
     printf("Header:\n");
     printf("Title: %s\n", mail->header.title);
     printf("Sender: %s\n", mail->header.sender);
@@ -408,20 +645,26 @@ void print_email(Mail* mail){
     printf("------------------\n");
     printf("Mail Content:\n");
     printf("Content: %s\n", mail->mail_content.content);
+    printf("----------------------END---------------------------\n");
 }
 
 int main(int argc, char* argv[]){
     char intro[] = "Welcome to Mogwarts University";
-    greeting(intro);
+    // greeting(intro);
+    /*
+        init array before jumping into the terminal
+    */
+    init_arrs();
     spawn_terminal();
-    // char* file_name = create_and_edit_file();
-    // mail_counting ++;
-    // if (file_name){
-    //     printf("Create file successfully! %s\n", file_name);
-    // }
-    // Mail* new_mail = parse_user_input_and_create_mail(file_name);
-    // print_email(new_mail);
-    // free(file_name);
-    // free_email(new_mail);
+    /*
+        Lowercase string testing:
+            char* original = "SSSSupaMAANNNN";
+            char* string = strdup(original);
+            printf("hehe\n");
+            lower_the_string(string);
+            printf("The string: %s\n", string);
+            free(string);
+    */
+    free_arrs();
     return 0;
 }
