@@ -5,7 +5,8 @@ should be available in your program. The feature test macro
 makes sure that only the functions and features from the 
 specified version are available.
 */
-
+#ifndef MAIL_USER_AGENT_H
+#define MAIL_USER_AGENT_H
 #define _XOPEN_SOURCE 500
 
 #include <stdlib.h>
@@ -131,3 +132,5 @@ void lower_the_string(char*);
 void greeting(char[]);
 void spawn_terminal();
 int main(int, char*[]);
+
+#endif

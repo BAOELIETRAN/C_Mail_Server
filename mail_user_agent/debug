@@ -1,28 +1,29 @@
 #!/bin/bash
 
-# Find all executable files in the current directory (excluding directories)
-executables=()
+# An array of executable files
+executable_files=()
 while IFS= read -r file; do
-    executables+=("$file")
+    executable_files+=("$file")
 done < <(find . -maxdepth 1 -type f -executable)
 
-# Check if we found any executable files
-if [ ${#executables[@]} -eq 0 ]; then
-    echo "No executable files found in the current directory."
+# Check if there exists any executable file
+if [[ ${#executable_files[@]} -eq 0 ]]; then
+    echo "There is no executable file in the current directory. Create one!"
     exit 1
-elif [ ${#executables[@]} -eq 1 ]; then
-    exe_file="${executables[0]}"
+elif [[ ${#executable_files[@]} -eq 1 ]]; then
+    exe_file="${#executable_files[0]}" 
 else
-    echo "Multiple executable files found:"
-    select exe_file in "${executables[@]}"; do
-        if [ -n "$exe_file" ]; then
+    echo "Multiple executable files found: "
+    #select helps us create a menu
+    select exe_file in "${executable_files[@]}"; do
+        if [[ -n $exe_file ]]; then
             break
         else
-            echo "Invalid selection. Try again."
+            echo "Invalid selection. Try again!"
         fi
     done
 fi
 
-# Run gdb on the selected executable
+#Run gdb on the selected choice
 echo "Running gdb on $exe_file..."
-gdb "$exe_file"
+gdb $exe_file
