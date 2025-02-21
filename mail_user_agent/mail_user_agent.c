@@ -4,6 +4,12 @@
     counting the order of sending mails
 */
 int mail_counting = 0;
+/*
+    define the send status:
+        0 --> the email is not sent
+        1 --> the email is sent
+*/
+int send_status = 0;
 
 /*
     17/2/2025:
@@ -14,28 +20,13 @@ int mail_counting = 0;
         - make mail --> create draft email
         - draft status/ delete/ print
         - send mail --> send mail
-    TODO: 
         - Create socket to connect to MSA for sending email
+    TODO: 
+        - THE COMMAND BETWEEN SERVERS NEED TO BE CAPITALIZED
+        - Decide the IP address and port for each server (MSA, MTA, MDA)
         - Create socket to connect to MDA for receiving email
         --> Implementing get email command
         - Implementing search command
-
-    @todo:
-    function for taking input from the user 
-    --> create_and_edit_file() --> return a file with input inside
-    @todo
-    create a function to cast information inside the newly created file
-    --> create an email with that information
-    @todo
-    done parsing user's input into array of tokens
-    Since the tokens array only contains the address of the first 
-    character of the string --> need to gather the characters until \0
-    to have the full token
-    --> read the blue print and do the terminal commands
-    create sockets, both for recv and send
-    send an email --> record that into array
-    receive an email --> record that into array
-    FINAL: terminal
 */
 
 /*
@@ -73,7 +64,7 @@ Mail* create_email(char* title, char* sender, char* receiver, char* content) {
     Mail* email = (Mail*)malloc(sizeof(Mail));
     if (email == NULL) {
         perror("Error allocating memory for Mail");
-        exit(EXIT_FAILURE);
+        return NULL;
     }
 
     strncpy(email->header.title, title, MAX_TITLE_LEN - 1);
@@ -111,14 +102,23 @@ void init_arrs(){
     if (send_arr == NULL){
         printf("Value of errno: %d\n", errno);
         perror("Error message from init_arrs() - send_arr:");
-        exit(EXIT_FAILURE);
+        return;
     }
     recv_arr = (Mail**)malloc(BUFFER_SIZE * sizeof(Mail*));
     if (recv_arr == NULL){
         printf("Value of errno: %d\n", errno);
         perror("Error message from init_arrs() - recv_arr:");
-        exit(EXIT_FAILURE);
+        return;
     }
+}
+
+void free_mail_array(Mail** MDA_array){
+    for (int i = 0; i < BUFFER_SIZE; i++) {
+        if (MDA_array[i]) {  
+            free(MDA_array[i]);  
+        }
+    }
+    free(MDA_array);  
 }
 
 void free_arrs() {
@@ -159,7 +159,7 @@ char* create_and_edit_file(){
     char* file_name = (char*)malloc(256);
     if (!file_name){
         perror("Creating a file failed - create_and_edit_file()");
-        exit(EXIT_FAILURE);
+        return NULL;
     }
     /*
         snprintf is a function in C that is used to format a string
@@ -178,7 +178,7 @@ char* create_and_edit_file(){
     */
     if (file_descriptor == -1){
         perror("Failed to create a temp file");
-        exit(EXIT_FAILURE);
+        return NULL;
     }
     // Open template file
     FILE* template = fopen(TEMPLATE_FILE, "r");
@@ -186,7 +186,7 @@ char* create_and_edit_file(){
         perror("Failed to open template file");
         close(file_descriptor);
         free(file_name);
-        exit(EXIT_FAILURE);
+        return NULL;
     }
     // Open temp file for writing
     /*
@@ -216,7 +216,7 @@ char* create_and_edit_file(){
     if (system_return == -1){
         perror("Can not execute the command - create_and_edit_file()");
         free(file_name);
-        exit(EXIT_FAILURE);
+        return NULL;
     }
     /*
         @attention: changing and redirecting 
@@ -299,7 +299,7 @@ Mail* parse_user_input_and_create_mail(char* file_name){
     char line[LINE_LENGTH];
     if (file_pointer == NULL){
         perror("Error opening file");
-        exit(EXIT_FAILURE);
+        return NULL;
     }
     /*
         read a line from a file that is pointed to by file_pointer 
@@ -380,12 +380,15 @@ void spawn_terminal(){
         --> if len >= 3 --> continue to the next prompt
         --> if the first argument != allowed ones --> continue to next prompt
         --> if == --> process the next argument (dependently)
+        @attention:  
+            for send and get, activate the socket when finishing the servers (MDA, MSA, MTA)
+            decide address for servers as well
     */
     do{
         char* buffer = (char*)malloc(BUFFER_SIZE);
         if (buffer == NULL){
             perror("Failed to allocate buffer!");
-            exit(EXIT_FAILURE);
+            return;
         }
         printf("Enter an input: ");
         /*
@@ -396,7 +399,7 @@ void spawn_terminal(){
         if (fgets(buffer, BUFFER_SIZE, stdin) == NULL){
             perror("Failed to read the input string!");
             free(buffer);
-            exit(EXIT_FAILURE);
+            return;
         }
         buffer[strcspn(buffer, "\n")] = '\0';
         /*
@@ -513,13 +516,13 @@ void spawn_terminal(){
                 mail_counting ++;
                 if (file_name == NULL){
                     perror("Allocate file for email unsuccessfully");
-                    exit(EXIT_FAILURE);
+                    return;
                 }
                 printf("Create file successfully! %s\n", file_name);
                 draft_email = parse_user_input_and_create_mail(file_name);
                 if (draft_email == NULL){
                     perror("Can not create email");
-                    exit(EXIT_FAILURE);
+                    return;
                 }
                 // print_email(draft_email);
                 free(file_name);
@@ -578,26 +581,89 @@ void spawn_terminal(){
             }
         }
         else if (strcmp(first_token, "send") == 0){
-            if (strcmp(second_token, "email") == 0){
+            if (strcmp(second_token, "mail") == 0){
                 /*
-                    @todo: 
-                    create a socket to connect to MSA 
-                    --> send the draft email through the socket
-                    Currently we assume that the email has been sent to MSA
-                    --> add the draft email to send array
-                    --> increase the send index
-                    --> if the array is out of space --> realloc
-                    --> free the draft email
+                    @brief: 
+                        create a socket to connect to MSA 
+                        --> send the draft email through the socket
+                    @attention: 
+                        the socket is not in used right now since 
+                        I want to wait for the socket from other server as well
+                        --> we assume that the email has been sent through socket
+                        --> add the draft email to send array
+                        --> increase the send index
+                        --> if the array is out of space --> realloc
+                        --> free the draft email
                 */
+                // int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+                // if (sockfd < 0){
+                //     perror("Socket creation failed");
+                //     return;
+                // }
+                // struct addrinfo server;
+                // struct addrinfo* res;
+                // const char* hostname = "IP ADDRESS OF MSA";
+                // const char* port = "PORT OF MSA";
+                // memset(&server, 0, sizeof(server));
+                // server.ai_family = AF_INET;
+                // server.ai_socktype = SOCK_STREAM;
+                // server.ai_protocol = 0;
+                // int status = getaddrinfo(hostname, port, &server, &res);
+                // if (status != 0){
+                //     fprintf(stderr, "get address error: %s\n", gai_strerror(status));
+                //     return;
+                // }
+                // struct addrinfo* temp = res;
+                // if (temp != NULL){
+                //     /*
+                //         convert ip address from binary to human readable
+                //     */
+                //     char ip_str[INET_ADDRSTRLEN];
+                //     struct sockaddr_in* information = (struct sockaddr_in*)temp->ai_addr;
+                //     inet_ntop(AF_INET, &information->sin_addr, ip_str, sizeof(ip_str));
+                //     /*
+                //         convert port number from network byte order to host byte order
+                //     */
+                //     unsigned short int port_number = ntohs(information->sin_port);
+                //     printf("Connecting to: %s:%u\n", ip_str, port_number);
+                //     /*
+                //         connect to the server
+                //     */
+                //     int connect_status = connect(sockfd, temp->ai_addr, temp->ai_addrlen);
+                //     if (connect_status < 0){
+                //         perror("Connect failed");
+                        // freeaddrinfo(res);
+                        // close(sockfd);
+                //         return;
+                //     }
+                //     /*
+                //         return the number of bytes sent. 
+                //         Otherwise, -1 shall be returned and errno set to indicate the error
+                //     */
+                //     Mail* email = draft_email;
+                //     ssize_t send_status = send(sockfd, email, sizeof(Mail), 0);
+                //     if (send_status < 0) {
+                //         perror("Message sending failed");
+                        // freeaddrinfo(res);
+                        // close(sockfd);
+                        // return
+                //     } else {
+                //         printf("Email sent successfully\n");
+                //     } 
+                // }
+                // freeaddrinfo(res);
+                // close(sockfd);
                 send_arr[cur_send_index] = draft_email;
                 cur_send_index ++;
                 // If cur_send_index is greater than or equal to BUFFER_SIZE, we need to reallocate
                 if (cur_send_index >= BUFFER_SIZE) {
-                    send_arr = (Mail**)realloc(send_arr, 2 * BUFFER_SIZE * sizeof(Mail*));
-                    if (send_arr == NULL) {
+                    Mail** temp_arr = (Mail**)realloc(send_arr, 2 * BUFFER_SIZE * sizeof(Mail*));
+                    if (temp_arr == NULL) {
                         perror("Allocate memory for send array unsuccessfully");
-                        exit(EXIT_FAILURE);
+                        cur_send_index --;
+                        return;
                     }
+                    send_arr = temp_arr;
                 }
                 free(draft_email);
                 draft_email = NULL;
@@ -610,13 +676,130 @@ void spawn_terminal(){
         }
         /*
             @brief:  
-            get the email from the MDA server
-            --> need to create socket to connect to MDA
-            After getting the email, put that into the receive array list
+                get the email from the MDA server
+                --> need to create socket to connect to MDA
+                send the message get --> MDA will send back with an array of mail
+                After getting the email, put those email into the receive array list
+            @attention: 
+                get the number of mail from MDA first
+                get the mail array later
         */
         else if (strcmp(first_token, "get") == 0){
             if (strcmp(second_token, "mail") == 0){
-                printf("Wait, implement later!\n");
+                // /*
+                //     array of received email
+                // */
+                // Mail** MDA_array = (Mail**)malloc(BUFFER_SIZE * sizeof(Mail*));
+                // /*
+                //     socket to connect to MDA server
+                // */
+                // int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+                // if (sockfd < 0){
+                //     perror("Socket creation failed");
+                //     free_mail_array(MDA_array);
+                //     return;
+                // }
+                // struct addrinfo server;
+                // struct addrinfo* res;
+                // const char* hostname = "IP ADDRESS OF MDA";
+                // const char* port = "PORT OF MDA";
+                // memset(&server, 0, sizeof(server));
+                // server.ai_family = AF_INET;
+                // server.ai_socktype = SOCK_STREAM;
+                // server.ai_protocol = 0;
+                // int status = getaddrinfo(hostname, port, &server, &res);
+                // if (status != 0){
+                //     fprintf(stderr, "get address error: %s\n", gai_strerror(status));
+                //     free_mail_array(MDA_array);
+                //     close(sockfd);
+                //     return;
+                // }
+                // struct addrinfo* temp = res;
+                // if (temp != NULL){
+                //     /*
+                //         convert ip address from binary to human readable
+                //     */
+                //     char ip_str[INET_ADDRSTRLEN];
+                //     struct sockaddr_in* information = (struct sockaddr_in*)temp->ai_addr;
+                //     inet_ntop(AF_INET, &information->sin_addr, ip_str, sizeof(ip_str));
+                //     /*
+                //         convert port number from network byte order to host byte order
+                //     */
+                //     unsigned short int port_number = ntohs(information->sin_port);
+                //     printf("Connecting to: %s:%u\n", ip_str, port_number);
+                //     /*
+                //         connect to the server
+                //     */
+                //     int connect_status = connect(sockfd, temp->ai_addr, temp->ai_addrlen);
+                //     if (connect_status < 0){
+                //         perror("Connect failed");
+                //         freeaddrinfo(res);
+                //         free_mail_array(MDA_array);
+                //         close(sockfd);
+                //         return;
+                //     }
+
+                //     const char* message = "GET";
+                //     ssize_t send_status = send(sockfd, message, strlen(message), 0);
+                //     if (send_status < 0){
+                //         perror("Message sent failed");
+                //         freeaddrinfo(res);
+                //         free_mail_array(MDA_array);
+                //         close(sockfd);
+                //         return;
+                //     }
+
+                //     /* Receive the number of emails first */
+                //     int email_count;
+                //     ssize_t recv_status = recv(sockfd, &email_count, sizeof(int), 0);
+                //     if (recv_status < 0) {
+                //         perror("Receive failed");
+                //         freeaddrinfo(res);
+                //         free_mail_array(MDA_array);
+                //         close(sockfd);
+                //         return;
+                //     }
+                //     if (email_count > BUFFER_SIZE){
+                //         Mail** temp_arr = (Mail**)realloc(MDA_array, 2 * BUFFER_SIZE * sizeof(Mail*));
+                //         if (temp_arr == NULL) {
+                //             perror("Allocate memory for MDA array unsuccessfully");
+                //             freeaddrinfo(res);
+                //             free_mail_array(MDA_array);
+                //             close(sockfd);
+                //             return;
+                //         }
+                //         MDA_array = temp_arr;
+                //     }
+                //     ssize_t email_recv_status = recv(sockfd, MDA_array, email_count * sizeof(Mail*), 0);
+                //     if (email_recv_status < 0) {
+                //         perror("Receive failed");
+                //         freeaddrinfo(res);
+                //         free_mail_array(MDA_array);
+                //         close(sockfd);
+                //         return;
+                //     }
+                //     for (int i = 0; i < email_count; i ++){
+                //         recv_arr[i] = MDA_array[i];
+                //         cur_recv_index ++;
+                //         // If cur_recv_index is greater than or equal to BUFFER_SIZE, we need to reallocate
+                //         if (cur_recv_index >= BUFFER_SIZE) {
+                //             Mail** temp_arr = (Mail**)realloc(recv_arr, 2 * BUFFER_SIZE * sizeof(Mail*));
+                //             if (temp_arr == NULL) {
+                //                 perror("Allocate memory for send array unsuccessfully");
+                //                 cur_recv_index --;
+                //                 freeaddrinfo(res);
+                //                 free_mail_array(MDA_array);
+                //                 close(sockfd);
+                //                 return;
+                //             }
+                //             recv_arr = temp_arr;
+                //         }
+                //     }  
+                // }
+                // free_mail_array(MDA_array);
+                // freeaddrinfo(res);
+                // close(sockfd);
+                printf("Wait, waiting for finishing servers!\n");
                 continue;
             }
             else{

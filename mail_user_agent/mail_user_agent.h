@@ -8,6 +8,7 @@ specified version are available.
 #ifndef MAIL_USER_AGENT_H
 #define MAIL_USER_AGENT_H
 #define _XOPEN_SOURCE 500
+#define _POSIX_C_SOURCE 200112L
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -18,8 +19,11 @@ specified version are available.
 #include <unistd.h>
 #include <pthread.h>
 #include <errno.h>
-
-#pragma once
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <sys/types.h>
 
 #define TEMPLATE_FILE "template.txt"
 #define RESET_ALL "\033[0m"
@@ -61,6 +65,17 @@ specified version are available.
 */
 #define CLEAR_SCREEN "\033[H\033[J"
 
+/*
+    counting the order of sending mails
+*/
+extern int mail_counting;
+
+/*
+    define the send status:
+        0 --> the email is not sent
+        1 --> the email is sent
+*/
+extern int send_status;
 /*
     define an email
     Two components of an email:
@@ -123,9 +138,10 @@ int cur_recv_index;
 Mail** send_arr;
 Mail** recv_arr;
 
-
 Mail* create_email(char*, char*, char*, char*);
 void free_email(Mail*);
+void free_arrs();
+void free_mail_array(Mail**);
 Mail* parse_user_input_and_create_mail(char*);
 void print_email(Mail*);
 void lower_the_string(char*);
