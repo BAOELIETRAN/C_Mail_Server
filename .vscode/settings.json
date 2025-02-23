@@ -1,0 +1,14 @@
+{
+    "files.associations": {
+        "mail_user_agent.h": "c",
+        "stdio.h": "c",
+        "inet.h": "c",
+        "netdb.h": "c",
+        "in.h": "c",
+        "stdlib.h": "c",
+        "string.h": "c",
+        "socket.h": "c",
+        "unistd.h": "c"
+    },
+    "C_Cpp.errorSquiggles": "disabled"
+}

@@ -4,18 +4,9 @@
     counting the number of sending mails
 */
 int mail_counting = 0;
-/*
-    define the send status:
-        0 --> the email is not sent
-        1 --> the email is sent
-    set the sent status = 1 to notify the MSA 
-    that the message has been sent --> so that it can open the socket.
-    When done --> MSA change status to 0 and close the socket
-*/
-int send_status = 0;
 
 /*
-    17/2/2025:
+    22/2/2025:
     DONE: 
         Create some commands in terminal:
         - Lowercase the tokens
@@ -26,11 +17,11 @@ int send_status = 0;
         - Create socket to connect to MSA for sending email
         - Create socket to connect to MDA for receiving email
         - Implementing get email command
+        - Renaming and Throwing emails into folder (the commented code)
+        - Test the code with creating multiple mails
     TODO: 
         - THE COMMAND BETWEEN SERVERS NEED TO BE CAPITALIZED
         - Decide the IP address and port for each server (MSA, MTA, MDA)
-        - Renaming and Throwing emails into folder (the commented code)
-        - Test the code with creating multiple mails
 */
 
 /*
@@ -67,12 +58,14 @@ int send_status = 0;
             char dest[5];
             strncpy(dest, src, 5);  // dest will be "Hello", but NOT null-terminated    
 */
-Mail* create_email(char* title, char* sender, char* receiver, char* content) {
+Mail* create_email(int id, char* title, char* sender, char* receiver, char* content) {
     Mail* email = (Mail*)malloc(sizeof(Mail));
     if (email == NULL) {
         perror("Error allocating memory for Mail");
         return NULL;
     }
+
+    email->id = id;
 
     strncpy(email->header.title, title, MAX_TITLE_LEN - 1);
     email->header.title[MAX_TITLE_LEN - 1] = '\0';  // Ensure null termination
@@ -124,13 +117,13 @@ void init_arrs(){
     @brief: 
         free the content inside the array and the whole array
 */
-void free_mail_array(Mail** MDA_array){
+void free_mail_array(Mail** Mail_array){
     for (int i = 0; i < BUFFER_SIZE; i++) {
-        if (MDA_array[i]) {  
-            free(MDA_array[i]);  
+        if (Mail_array[i]) {  
+            free_email(Mail_array[i]);  
         }
     }
-    free(MDA_array);  
+    free(Mail_array);  
 }
 
 /*
@@ -145,12 +138,12 @@ void free_arrs() {
     for (int i = 0; i < cur_send_index; i++) {
         if (send_arr[i]) {  
             // Free dynamically allocated fields inside Mail (if any)
-            free(send_arr[i]);  
+            free_email(send_arr[i]);  
         }
     }
     for (int i = 0; i < cur_recv_index; i++) {
         if (recv_arr[i]) {  
-            free(recv_arr[i]);  
+            free_email(recv_arr[i]);  
         }
     }
     
@@ -255,6 +248,7 @@ char* create_and_edit_file(){
 Mail* parse_user_input_and_create_mail(char* file_name){
     FILE* file_pointer = fopen(file_name, "r");
     int index = 0;
+    int id = mail_counting;
     char title[MAX_TITLE_LEN] = "";
     char sender[MAX_SENDER_LEN] = "";
     char receiver[MAX_RECEIVER_LEN] = "";
@@ -297,7 +291,7 @@ Mail* parse_user_input_and_create_mail(char* file_name){
         }
     }   
     fclose(file_pointer);
-    Mail* new_email = create_email(title, sender, receiver, content);
+    Mail* new_email = create_email(mail_counting, title, sender, receiver, content);
     return new_email;
 }
 
@@ -615,6 +609,7 @@ void spawn_terminal(){
                 //         return the number of bytes sent. 
                 //         Otherwise, -1 shall be returned and errno set to indicate the error
                 //     */
+                //     be careful with this one!
                 //     Mail* email = draft_email;
                 //     ssize_t send_status = send(sockfd, email, sizeof(Mail), 0);
                 //     if (send_status < 0) {
@@ -793,6 +788,7 @@ void spawn_terminal(){
 */
 void print_email(Mail* mail){
     printf("---------------------START---------------------------\n");
+    printf("ID: %d\n", mail->id);
     printf("Header:\n");
     printf("Title: %s\n", mail->header.title);
     printf("Sender: %s\n", mail->header.sender);
