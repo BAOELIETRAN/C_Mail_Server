@@ -1,13 +1,16 @@
 #include "mail_user_agent.h"
 
 /*
-    counting the order of sending mails
+    counting the number of sending mails
 */
 int mail_counting = 0;
 /*
     define the send status:
         0 --> the email is not sent
         1 --> the email is sent
+    set the sent status = 1 to notify the MSA 
+    that the message has been sent --> so that it can open the socket.
+    When done --> MSA change status to 0 and close the socket
 */
 int send_status = 0;
 
@@ -21,44 +24,48 @@ int send_status = 0;
         - draft status/ delete/ print
         - send mail --> send mail
         - Create socket to connect to MSA for sending email
+        - Create socket to connect to MDA for receiving email
+        - Implementing get email command
     TODO: 
         - THE COMMAND BETWEEN SERVERS NEED TO BE CAPITALIZED
         - Decide the IP address and port for each server (MSA, MTA, MDA)
-        - Create socket to connect to MDA for receiving email
-        --> Implementing get email command
-        - Implementing search command
+        - Renaming and Throwing emails into folder (the commented code)
+        - Test the code with creating multiple mails
 */
 
 /*
-    Need to allocate memories for the strings inside each struct
-    Since they are stored by reference
-    @attention: No need to create pointers for mail_content and header structs 
-                since they are part of the Mail struct and allocated together.
-    Update: copy src -> dst, copy len - 1 byte, assign the last byte to be null
-    strcpy:
-        Copies a string without checking the destination buffer size.
-        Stops copying at the null terminator (\0).
-        Risk: If the destination buffer is too small, it leads to buffer overflows.
-    strncpy: 
-        Copies up to n characters, even if the source string is shorter.
-        If the source string is smaller than n, it fills the remaining space with garbage 
-        (before C99) or zeros (after C99).
-        If the source string is longer than n, it does not add a null terminator (\0).
-    When copy, we need to ensure that the final byte of the string is null byte.
-    When copying a string from src to dest, we need to ensure that.
-    the null terminator ('\0') of the source string is properly copied as well.
-    strlen(src) does not count the null byte in src.
-    strncpy(dest, src, n_bytes);
-    if len(src) < n --> copy the entire string including the null byte.
-    if len(src) > n --> copy the n characters of src and not adding null byte to dest
-    Ex: len(src) < len(dest)
-        char src[] = "Hello";
-        char dest[10];
-        strncpy(dest, src, 10);  // dest will be "Hello\0\0\0\0\0"
-    Ex: len(src) > len(dest)
-        char src[] = "HelloWorld";
-        char dest[5];
-        strncpy(dest, src, 5);  // dest will be "Hello", but NOT null-terminated    
+    @brief: 
+        create an email based on the content
+    @attention: 
+        Need to allocate memories for the strings inside each struct
+        Since they are stored by reference
+        @attention: No need to create pointers for mail_content and header structs 
+                    since they are part of the Mail struct and allocated together.
+        Update: copy src -> dst, copy len - 1 byte, assign the last byte to be null
+        strcpy:
+            Copies a string without checking the destination buffer size.
+            Stops copying at the null terminator (\0).
+            Risk: If the destination buffer is too small, it leads to buffer overflows.
+        strncpy: 
+            Copies up to n characters, even if the source string is shorter.
+            If the source string is smaller than n, it fills the remaining space with garbage 
+            (before C99) or zeros (after C99).
+            If the source string is longer than n, it does not add a null terminator (\0).
+        When copy, we need to ensure that the final byte of the string is null byte.
+        When copying a string from src to dest, we need to ensure that.
+        the null terminator ('\0') of the source string is properly copied as well.
+        strlen(src) does not count the null byte in src.
+        strncpy(dest, src, n_bytes);
+        if len(src) < n --> copy the entire string including the null byte.
+        if len(src) > n --> copy the n characters of src and not adding null byte to dest
+        Ex: len(src) < len(dest)
+            char src[] = "Hello";
+            char dest[10];
+            strncpy(dest, src, 10);  // dest will be "Hello\0\0\0\0\0"
+        Ex: len(src) > len(dest)
+            char src[] = "HelloWorld";
+            char dest[5];
+            strncpy(dest, src, 5);  // dest will be "Hello", but NOT null-terminated    
 */
 Mail* create_email(char* title, char* sender, char* receiver, char* content) {
     Mail* email = (Mail*)malloc(sizeof(Mail));
@@ -83,7 +90,8 @@ Mail* create_email(char* title, char* sender, char* receiver, char* content) {
 }
 
 /*
-    free the email after done using
+    @brief: 
+        the email after done using
 */
 void free_email(Mail* email){
     if (email){
@@ -92,8 +100,8 @@ void free_email(Mail* email){
 }
 
 /*
-    if there is no slot left in the array
-    --> increase the size using realloc()
+    @brief: 
+        init cur_send_index and cur_recv_index arrays
 */
 void init_arrs(){
     cur_send_index = 0;
@@ -112,6 +120,10 @@ void init_arrs(){
     }
 }
 
+/*
+    @brief: 
+        free the content inside the array and the whole array
+*/
 void free_mail_array(Mail** MDA_array){
     for (int i = 0; i < BUFFER_SIZE; i++) {
         if (MDA_array[i]) {  
@@ -121,6 +133,11 @@ void free_mail_array(Mail** MDA_array){
     free(MDA_array);  
 }
 
+/*
+    @brief:  
+        free the content of cur_send and cur_receive
+        reset send and receive information to default
+*/
 void free_arrs() {
     /*
         Free every email in the array and then free the array itself
@@ -152,7 +169,8 @@ void free_arrs() {
 
 
 /*
-    Function to create a file, open it in an editor, and return the filename
+    @brief: 
+        create a file, open it in an editor, and return the filename
 */
 char* create_and_edit_file(){
     int file_descriptor;
@@ -218,74 +236,23 @@ char* create_and_edit_file(){
         free(file_name);
         return NULL;
     }
-    /*
-        @attention: changing and redirecting 
-        the file right now will make us lost track 
-        of the file
-        --> Solution: after creating a file, we will 
-        change the name and redirect it while running the loop in the terminal
-    */
-    // /*
-    //     command created a file on disk
-    //     --> need to rename the file on disk
-    //     --> cannot use snprintf since the file is not on memory
-    //     --> use rename() to change the name on the disk
-    // */
-    // char new_file_name[256];
-    // snprintf(new_file_name, sizeof(new_file_name), "email-%d", mail_counting);
-    
-    // /*
-    //     @brief: Rename the file on disk to match the new name
-    // */
-    // if (rename(file_name, new_file_name) != 0) {
-    //     perror("Failed to rename the file");
-    //     free(file_name);
-    //     exit(EXIT_FAILURE);
-    // }
-    // /*
-    //     @brief: redirect email to folder
-    //     @attention: need to use the new name of the mail
-    // */
-    // char redirect_command[512];
-    // snprintf(redirect_command, sizeof(redirect_command), "mv %s Send_Emails", new_file_name);
-    // int system_return_redirect = system(redirect_command);
-    // if (system_return_redirect == -1){
-    //     perror("Can not execute the command - create_and_edit_file()");
-    //     free(file_name);
-    //     exit(EXIT_FAILURE);
-    // }
-    // /*
-    //     must free after done using the file
-    // */
     return file_name;
 }
 
 /*
-    @attention: the user input and create an email based on that information
-    strcspn --> calculate the length of the initial segment of the string 
-    that does not contain any character from the set 
-    strncmp --> compare N characters of S1 to S2
-    strncmp will stop comparing when it hits the null byte or source or destination
-    strncat --> safe string concatenation
-    --> append at most n characters from src to dest
-    --> ensure dest remains null-terminated
-    --> if the length of the source string exceeds the remaining space --> overflow
+    @brief: 
+        the user input and create an email based on that information
+    @attention: 
+        strcspn --> calculate the length of the initial segment of the string 
+        that does not contain any character from the set 
+        strncmp --> compare N characters of S1 to S2
+        strncmp will stop comparing when it hits the null byte or source or destination
+        strncat --> safe string concatenation
+        --> append at most n characters from src to dest
+        --> ensure dest remains null-terminated
+        --> if the length of the source string exceeds the remaining space --> overflow
 */
 Mail* parse_user_input_and_create_mail(char* file_name){
-    /*
-        typedef struct{
-        struct Header{
-            char* title;
-            char* sender;
-            char* receiver;
-        }; 
-        struct Header header;
-        struct Mail_Content{
-            char* content;
-        };
-        struct Mail_Content mail_content;
-        } Mail;
-    */
     FILE* file_pointer = fopen(file_name, "r");
     int index = 0;
     char title[MAX_TITLE_LEN] = "";
@@ -364,7 +331,7 @@ void greeting(char intro[]) {
 
 /*
     @brief:
-    --> turn the string in the memory to lowercase
+        turn the string in the memory to lowercase
 */
 void lower_the_string(char* string){
     char* pointer = string;
@@ -374,6 +341,10 @@ void lower_the_string(char* string){
     }
 }
 
+/*
+    @brief: 
+        spawn the terminal to ask for user inputs and display outputs
+*/
 void spawn_terminal(){
     /*
         receive the input --> turn that input into array of arguments
@@ -445,13 +416,6 @@ void spawn_terminal(){
                 }
             }
         }
-        /*
-            Lowering every token and print them out
-        */
-        for (int i = 0; i < token_count; i ++){
-            lower_the_string(tokens[i]);
-            printf("Token %d: %s\n", i + 1, tokens[i]);
-        }
         if (token_count > 0 && strcmp(tokens[0], "exit") == 0) {
             break;
         }
@@ -513,7 +477,6 @@ void spawn_terminal(){
         else if (strcmp(first_token, "make") == 0){
             if (strcmp(second_token, "mail") == 0){
                 char* file_name = create_and_edit_file();
-                mail_counting ++;
                 if (file_name == NULL){
                     perror("Allocate file for email unsuccessfully");
                     return;
@@ -524,9 +487,21 @@ void spawn_terminal(){
                     perror("Can not create email");
                     return;
                 }
-                // print_email(draft_email);
+                /*
+                    @brief: redirect newly created mails to folder
+                */
+                char redirect_command[512];
+                snprintf(redirect_command, sizeof(redirect_command), "mv %s Send_Emails", file_name);
+                int system_return_redirect = system(redirect_command);
+                if (system_return_redirect == -1){
+                    perror("Can not execute the command - create_and_edit_file()");
+                    free(file_name);
+                    return;
+                }
+                /*
+                    must free after done using the file
+                */
                 free(file_name);
-                // free_email(draft_email);
             }
             else{
                 printf("The command is not correct, try again!\n");
@@ -535,11 +510,11 @@ void spawn_terminal(){
         }
         /*
             @brief: 
-            Since we create an email --> we will create a draft email
-            --> we need to check whether the draft email exist
-            --> if no: tell the user to create an email --> continue
-            --> if yes: send or delete
-            Additional command --> print draft email
+                Since we create an email --> we will create a draft email
+                --> we need to check whether the draft email exist
+                --> if no: tell the user to create an email --> continue
+                --> if yes: send or delete
+                Additional command --> print draft email
         */
         else if (strcmp(first_token, "draft") == 0){
             if (strcmp(second_token, "status") == 0){
@@ -648,11 +623,13 @@ void spawn_terminal(){
                         // close(sockfd);
                         // return
                 //     } else {
+                    //     send_status = 1;
                 //         printf("Email sent successfully\n");
                 //     } 
                 // }
                 // freeaddrinfo(res);
                 // close(sockfd);
+                mail_counting ++;
                 send_arr[cur_send_index] = draft_email;
                 cur_send_index ++;
                 // If cur_send_index is greater than or equal to BUFFER_SIZE, we need to reallocate
@@ -665,7 +642,6 @@ void spawn_terminal(){
                     }
                     send_arr = temp_arr;
                 }
-                free(draft_email);
                 draft_email = NULL;
                 printf("Delete the draft email successfully!\n");
             }
@@ -807,18 +783,14 @@ void spawn_terminal(){
                 continue;
             }
         }
-        /*
-            @brief: 
-            search for keyword in the mail array
-        */
-        else if (strcmp(first_token, "search") == 0){
-            printf("Wait, implement later!\n");
-            continue;
-        }
         free(buffer);
     }while(1);
 }
 
+/*
+    @brief: 
+        print the content of an email
+*/
 void print_email(Mail* mail){
     printf("---------------------START---------------------------\n");
     printf("Header:\n");
@@ -827,27 +799,20 @@ void print_email(Mail* mail){
     printf("Receiver: %s\n", mail->header.receiver);
     printf("------------------\n");
     printf("Mail Content:\n");
-    printf("Content: %s\n", mail->mail_content.content);
+    printf("Content:\n");
+    printf("%s\n", mail->mail_content.content);
     printf("----------------------END---------------------------\n");
 }
 
+/*
+    @brief: 
+        main function to run main things
+*/
 int main(int argc, char* argv[]){
     char intro[] = "Welcome to Mogwarts University";
-    // greeting(intro);
-    /*
-        init array before jumping into the terminal
-    */
+    greeting(intro);
     init_arrs();
     spawn_terminal();
-    /*
-        Lowercase string testing:
-            char* original = "SSSSupaMAANNNN";
-            char* string = strdup(original);
-            printf("hehe\n");
-            lower_the_string(string);
-            printf("The string: %s\n", string);
-            free(string);
-    */
     free_arrs();
     return 0;
 }
