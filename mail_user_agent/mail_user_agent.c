@@ -22,6 +22,11 @@ int mail_counting = 0;
     TODO: 
         - THE COMMAND BETWEEN SERVERS NEED TO BE CAPITALIZED
         - Decide the IP address and port for each server (MSA, MTA, MDA)
+    FIX (for send email socket):
+        - Make the socket connection from MUA to MDA seemless (always open). 
+        - When start the program, each part will start up and connect to each other
+        through sockets
+        - Sent message --> MSA --> MTA --> "sent successfully".
 */
 
 /*
@@ -337,6 +342,103 @@ void lower_the_string(char* string){
 
 /*
     @brief: 
+        create a sockaddr_in structure with given ip address and port 
+    @param: 
+        ip - string ip address
+        port - int port number
+    @return: 
+        the pointer to the sockaddr_in structure with given ip address and port
+*/
+struct sockaddr_in* createIPv4Address(const char* ip, int port){
+    /*
+        sockaddr_in --> structure designed for IPv4 address
+    */
+    struct sockaddr_in* address = (struct sockaddr_in*)malloc(sizeof(struct sockaddr_in));
+    if (address == NULL){
+        perror("Allocation failed!\n");
+        return NULL;
+    }
+    /*
+        port that used to listen to incoming connection
+    */
+    address->sin_port = htons(port);
+    address->sin_family = AF_INET;
+    /*
+        if the ip is empty --> it is server ip --> set it to INADDR_ANY
+        --> we tell the (client) socket that accept connections from any IPAddress
+        that the machine can listen on 
+        address->sin_addr.s_addr == destination address
+    */
+    if (strlen(ip) == 0){
+        address->sin_addr.s_addr = INADDR_ANY;
+    }
+    else{
+        /*
+            convert IP addr from string format into binary representation
+        */
+        if (inet_pton(AF_INET, ip, &address->sin_addr.s_addr) <= 0){
+            perror("Invalid IP Address\n");
+            free(address);
+            return NULL;
+        }
+    }
+    return address;
+}
+
+/*
+    @brief: 
+        listen to message and print message on new thread
+    @param: 
+        file descriptor of the socket of a client
+    @return: 
+        None
+*/
+void start_listening_and_print_messages_on_new_thread(int socketFD){
+    pthread_t id;
+    pthread_create(&id, NULL, listen_and_print, (void *)(intptr_t)socketFD);
+    pthread_detach(id);
+}
+
+/*
+    @brief: 
+        listen and print message
+    @param: 
+        void pointer to argument 
+    @return: 
+        void pointer
+*/
+void* listen_and_print(void *arg){
+    int socketFD = (int)(intptr_t)arg;
+    char buffer[1024];
+    while (true){
+        /*
+            server listens to multiple clients --> need to specify client_socketFD
+        */
+        ssize_t amountWasReceived = recv(socketFD, buffer, 1024, 0);
+        if (amountWasReceived > 0)
+        {
+            buffer[amountWasReceived] = '\0';
+            printf("Response was: %s\n", buffer);
+        }
+        else if (amountWasReceived <= 0)
+        {
+            break;
+        }
+    }
+    close(socketFD);
+    return NULL;
+}
+
+/*
+    @brief: 
+        return a file descriptor for a new IPv4 socket 
+*/
+int CreateTCPIPv4Socket(){
+    return socket(AF_INET, SOCK_STREAM, 0);
+}
+
+/*
+    @brief: 
         spawn the terminal to ask for user inputs and display outputs
 */
 void spawn_terminal(){
@@ -350,11 +452,8 @@ void spawn_terminal(){
             decide address for servers as well
     */
     do{
-        char* buffer = (char*)malloc(BUFFER_SIZE);
-        if (buffer == NULL){
-            perror("Failed to allocate buffer!");
-            return;
-        }
+        char buffer[BUFFER_SIZE];
+        memset(buffer, '\0', BUFFER_SIZE);
         printf("Enter an input: ");
         /*
             fgets reads full line of text
@@ -363,7 +462,6 @@ void spawn_terminal(){
         */
         if (fgets(buffer, BUFFER_SIZE, stdin) == NULL){
             perror("Failed to read the input string!");
-            free(buffer);
             return;
         }
         buffer[strcspn(buffer, "\n")] = '\0';
@@ -473,13 +571,14 @@ void spawn_terminal(){
                 char* file_name = create_and_edit_file();
                 if (file_name == NULL){
                     perror("Allocate file for email unsuccessfully");
-                    return;
+                    break;
                 }
                 printf("Create file successfully! %s\n", file_name);
                 draft_email = parse_user_input_and_create_mail(file_name);
                 if (draft_email == NULL){
                     perror("Can not create email");
-                    return;
+                    free(file_name);
+                    break;
                 }
                 /*
                     @brief: redirect newly created mails to folder
@@ -490,7 +589,7 @@ void spawn_terminal(){
                 if (system_return_redirect == -1){
                     perror("Can not execute the command - create_and_edit_file()");
                     free(file_name);
-                    return;
+                    break;
                 }
                 /*
                     must free after done using the file
@@ -556,74 +655,64 @@ void spawn_terminal(){
                         create a socket to connect to MSA 
                         --> send the draft email through the socket
                     @attention: 
-                        the socket is not in used right now since 
-                        I want to wait for the socket from other server as well
+                        check: return or continue
+                        test the socket first by setting a simple server socket on MSA side
                         --> we assume that the email has been sent through socket
                         --> add the draft email to send array
                         --> increase the send index
                         --> if the array is out of space --> realloc
                         --> free the draft email
-                */
-                // int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-                // if (sockfd < 0){
-                //     perror("Socket creation failed");
-                //     return;
+                // */
+                // /*
+                //     if socketFD > 0 --> socket created successfully
+                // */
+                // int socketFD = CreateTCPIPv4Socket();
+                // if (socketFD <= 0){
+                //     perror("Socket is created unsuccessfully!\n");
+                //     break;
                 // }
-                // struct addrinfo server;
-                // struct addrinfo* res;
-                // const char* hostname = "IP ADDRESS OF MSA";
-                // const char* port = "PORT OF MSA";
-                // memset(&server, 0, sizeof(server));
-                // server.ai_family = AF_INET;
-                // server.ai_socktype = SOCK_STREAM;
-                // server.ai_protocol = 0;
-                // int status = getaddrinfo(hostname, port, &server, &res);
-                // if (status != 0){
-                //     fprintf(stderr, "get address error: %s\n", gai_strerror(status));
-                //     return;
+                // struct sockaddr_in* address = createIPv4Address("127.0.0.1", 2000);
+                // /*
+                //     connect to the server
+                // */
+                // int result = connect(socketFD, (struct sockaddr*)address, sizeof(*address));
+                // if (result < 0){
+                //     perror("Connection is unsuccessful!\n");
+                //     free(address);
+                //     close(socketFD);
+                //     break;
                 // }
-                // struct addrinfo* temp = res;
-                // if (temp != NULL){
-                //     /*
-                //         convert ip address from binary to human readable
-                //     */
-                //     char ip_str[INET_ADDRSTRLEN];
-                //     struct sockaddr_in* information = (struct sockaddr_in*)temp->ai_addr;
-                //     inet_ntop(AF_INET, &information->sin_addr, ip_str, sizeof(ip_str));
-                //     /*
-                //         convert port number from network byte order to host byte order
-                //     */
-                //     unsigned short int port_number = ntohs(information->sin_port);
-                //     printf("Connecting to: %s:%u\n", ip_str, port_number);
-                //     /*
-                //         connect to the server
-                //     */
-                //     int connect_status = connect(sockfd, temp->ai_addr, temp->ai_addrlen);
-                //     if (connect_status < 0){
-                //         perror("Connect failed");
-                        // freeaddrinfo(res);
-                        // close(sockfd);
-                //         return;
-                //     }
-                //     /*
-                //         return the number of bytes sent. 
-                //         Otherwise, -1 shall be returned and errno set to indicate the error
-                //     */
+                // printf("Connection is successful!\n");
+                // free(address);
+
+                // start_listening_and_print_messages_on_new_thread(socketFD);
+
+                // /*
+                //     send email through socket
                 //     be careful with this one!
-                //     Mail* email = draft_email;
-                //     ssize_t send_status = send(sockfd, email, sizeof(Mail), 0);
-                //     if (send_status < 0) {
-                //         perror("Message sending failed");
-                        // freeaddrinfo(res);
-                        // close(sockfd);
-                        // return
-                //     } else {
-                    //     send_status = 1;
-                //         printf("Email sent successfully\n");
-                //     } 
-                // }
-                // freeaddrinfo(res);
-                // close(sockfd);
+                // */
+                // /*
+                //     return the number of bytes sent. 
+                //     Otherwise, -1 shall be returned and errno set to indicate the error
+                // */  
+                // Mail* email = draft_email;
+                // ssize_t send_status = send(sockfd, email, sizeof(Mail), 0);
+                // if (send_status < 0) {
+                //     perror("Message sending failed");
+                //     close(socketFD);
+                //     break;
+                // } 
+                // printf("Email sent successfully\n");
+                // /*
+                //     listen here
+                // */
+                // close(socketFD);
+                /*
+                    --> add the draft email to send array
+                    --> increase the send index
+                    --> if the array is out of space --> realloc
+                    --> free the draft email
+                */
                 mail_counting ++;
                 send_arr[cur_send_index] = draft_email;
                 cur_send_index ++;
@@ -633,7 +722,7 @@ void spawn_terminal(){
                     if (temp_arr == NULL) {
                         perror("Allocate memory for send array unsuccessfully");
                         cur_send_index --;
-                        return;
+                        break;
                     }
                     send_arr = temp_arr;
                 }
@@ -778,8 +867,8 @@ void spawn_terminal(){
                 continue;
             }
         }
-        free(buffer);
     }while(1);
+    free_email(draft_email);
 }
 
 /*
@@ -809,6 +898,10 @@ int main(int argc, char* argv[]){
     greeting(intro);
     init_arrs();
     spawn_terminal();
+    /*
+        check lại xem các condition đã đủ chưa
+        exit có bị leak memory ko
+    */
     free_arrs();
     return 0;
 }

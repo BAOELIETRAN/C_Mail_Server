@@ -133,6 +133,13 @@ int cur_recv_index;
 Mail** send_arr;
 Mail** recv_arr;
 
+struct sockaddr_in* createIPv4Address(const char*, int);
+int CreateTCPIPv4Socket();
+/*
+    optional
+*/
+void start_listening_and_print_messages_on_new_thread(int);
+void* listen_and_print(void*);
 Mail* create_email(int, char*, char*, char*, char*);
 void free_email(Mail*);
 void free_arrs();
