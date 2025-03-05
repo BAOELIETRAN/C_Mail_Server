@@ -72,6 +72,8 @@ typedef struct{
     char* content_type;
 } MIME;
 
+struct sockaddr_in* createIPv4Address(const char*, int);
+int CreateTCPIPv4Socket();
 Mail* create_socket_and_receive_email_from_MUA(int);
 void free_email(Mail*);
 void free_mail_array(Mail**);

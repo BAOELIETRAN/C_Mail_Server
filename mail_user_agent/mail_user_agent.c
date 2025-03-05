@@ -662,51 +662,63 @@ void spawn_terminal(){
                         --> increase the send index
                         --> if the array is out of space --> realloc
                         --> free the draft email
-                // */
-                // /*
-                //     if socketFD > 0 --> socket created successfully
-                // */
-                // int socketFD = CreateTCPIPv4Socket();
-                // if (socketFD <= 0){
-                //     perror("Socket is created unsuccessfully!\n");
-                //     break;
-                // }
-                // struct sockaddr_in* address = createIPv4Address("127.0.0.1", 2000);
-                // /*
-                //     connect to the server
-                // */
-                // int result = connect(socketFD, (struct sockaddr*)address, sizeof(*address));
-                // if (result < 0){
-                //     perror("Connection is unsuccessful!\n");
-                //     free(address);
-                //     close(socketFD);
-                //     break;
-                // }
-                // printf("Connection is successful!\n");
-                // free(address);
+                */
+                /*
+                    if socketFD > 0 --> socket created successfully
+                */
+                int socketFD = CreateTCPIPv4Socket();
+                if (socketFD <= 0){
+                    perror("Socket is created unsuccessfully!\n");
+                    break;
+                }
+                struct sockaddr_in* address = createIPv4Address("127.0.0.1", 2000);
+                /*
+                    connect to the server
+                */
+                int result = connect(socketFD, (struct sockaddr*)address, sizeof(*address));
+                if (result < 0){
+                    perror("Connection is unsuccessful!\n");
+                    free(address);
+                    close(socketFD);
+                    break;
+                }
+                printf("Connection is successful!\n");
 
                 // start_listening_and_print_messages_on_new_thread(socketFD);
 
-                // /*
-                //     send email through socket
-                //     be careful with this one!
-                // */
-                // /*
-                //     return the number of bytes sent. 
-                //     Otherwise, -1 shall be returned and errno set to indicate the error
-                // */  
-                // Mail* email = draft_email;
-                // ssize_t send_status = send(sockfd, email, sizeof(Mail), 0);
-                // if (send_status < 0) {
-                //     perror("Message sending failed");
-                //     close(socketFD);
-                //     break;
-                // } 
-                // printf("Email sent successfully\n");
-                // /*
-                //     listen here
-                // */
-                // close(socketFD);
+                /*
+                    send email through socket
+                    be careful with this one!
+                */
+                /*
+                    return the number of bytes sent. 
+                    Otherwise, -1 shall be returned and errno set to indicate the error
+                */  
+                Mail* email = draft_email;
+                ssize_t send_status = send(socketFD, email, sizeof(Mail), 0);
+                if (send_status < 0) {
+                    perror("Message sending failed");
+                    free(address);
+                    close(socketFD);
+                    break;
+                } 
+                printf("Email sent successfully\n");
+                /*
+                    listen here
+                */
+                char listen_buffer[BUFFER_SIZE];
+                ssize_t amountWasReceived = recv(socketFD, listen_buffer, BUFFER_SIZE, 0);
+                if (amountWasReceived > 0){
+                    listen_buffer[amountWasReceived] = '\0';
+                    printf("Response was: %s\n", listen_buffer);
+                }
+                else if (amountWasReceived <= 0){
+                    free(address);
+                    close(socketFD);
+                    break;
+                }
+                free(address);
+                close(socketFD);
                 /*
                     --> add the draft email to send array
                     --> increase the send index
