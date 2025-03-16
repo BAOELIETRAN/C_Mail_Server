@@ -700,11 +700,14 @@ void spawn_terminal(){
                     perror("Message sending failed");
                     free(address);
                     close(socketFD);
-                    break;
+                    // if we implement the queue with max size 
+                    // --> change that to continue
+                    // since we will resend when the queue is available
+                    continue;
                 } 
                 printf("Email sent successfully\n");
                 /*
-                    listen here
+                    listen message (not mail) here
                 */
                 char listen_buffer[BUFFER_SIZE];
                 ssize_t amountWasReceived = recv(socketFD, listen_buffer, BUFFER_SIZE, 0);
@@ -713,9 +716,10 @@ void spawn_terminal(){
                     printf("Response was: %s\n", listen_buffer);
                 }
                 else if (amountWasReceived <= 0){
+                    perror("Message receiving failed");
                     free(address);
                     close(socketFD);
-                    break;
+                    continue;
                 }
                 free(address);
                 close(socketFD);

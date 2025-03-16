@@ -2,6 +2,7 @@
 
 /*
     Sent message --> MSA --> MTA --> MDA --> "sent successfully".
+    "sent successfully" --> MTA --> MSA --> MUA
 */
 
 /*
@@ -14,18 +15,46 @@
 */
 
 /*
-    4/3/2025:
+    16/3/2025:
     DONE:
         Create a simple socket to listen and send with MUA
         Receive email from MUA, print it out, and send response back to MUA
-    TODO: 
-        Implement the server socket to be the broadcast one.
+        Implement the server socket to be multithread, and each will send to the MTA.
+        127.0.0.1 --> MSA
+        127.0.0.2 --> MTA
         Implement the queue to store email from MUA
+        --> if we don't do that here, we need to do that in MTA
+        --> when should we send mails in the queue?
+            If the number of receiving emails hit the max size of the queue
+            --> temporarily decline new emails and send old emails to MTA
+        ONLY STORE AND SEND COPIES!
         Set up the condition to send email to MTA
+    TODO: 
+        Change the code so that MSA will be a client connect to MTA
         (if the email can reach to the MDA, then the MUA will receive the message
         --> need a chain of response).
-
 */
+
+/*
+    Array of client accepted sockets
+*/
+AcceptedSocket accepted_sockets[10];
+/*
+    Number of accepted socket
+*/
+int accepted_socket_counter = 0;
+/*
+    Queue to store clients' incoming mails
+*/
+Mail mailing_queue[QUEUE_SIZE];
+/*
+    Count number of receving mails
+*/
+int mail_counting = 0;
+/*
+    Declare mutex lock
+*/
+pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /*
     @brief: 
@@ -104,13 +133,142 @@ int CreateTCPIPv4Socket(){
 }
 
 /*
-    @todo: 
-    First, implement a simple socket to hear and response to MUA
-    Then, implement the server socket here so that 
-    it will broadcast the email from client to other server
+    @brief: 
+        accept connections from clients
+    @param: 
+        server_socketFD
+    @return: 
+        pointer to the struct that contains the information about a client
 */
-Mail* create_socket_and_receive_email_from_MUA(int socket_fd){
-    
+AcceptedSocket* acceptIncomingConnection(int server_socketFD){
+    /*
+        accept() will return the socketFD of the connecting client
+    */
+    struct sockaddr_in client_address;
+    socklen_t client_addr_size = sizeof(struct sockaddr_in);
+    int client_socketFD = accept(server_socketFD, (struct sockaddr*)&client_address, &client_addr_size);
+    AcceptedSocket* accepted_socket = (AcceptedSocket*)malloc(sizeof(AcceptedSocket));
+    accepted_socket->address = client_address;
+    accepted_socket->accepted_socketFD = client_socketFD;
+    accepted_socket->accepted_successfully = client_socketFD > 0;
+    if (!accepted_socket->accepted_successfully){
+        accepted_socket->error = client_socketFD;
+    }
+    return accepted_socket;
+}
+
+/*
+    @brief: 
+        send the received email to other clients
+    @param: 
+        received email
+        socketFD of the client that we received the message
+    @return: 
+        void
+*/
+void send_the_received_message_to_the_MTA(Mail* received_email, int client_socketFD){
+    pthread_mutex_lock(&queue_mutex);
+    if (mail_counting >= QUEUE_SIZE){
+        //release after building MTA
+        // for (int i = 0; i < accepted_socket_counter; i ++){
+        //     /*
+        //         we only want to send email to the MTA server
+        //     */
+        //     struct in_addr target_ip;
+        //     inet_pton(AF_INET, "127.0.0.2", &target_ip);
+        //     if (accepted_sockets[i].address.sin_addr.s_addr == target_ip.s_addr){
+        //         // send the whole mailing queue
+        //         send(accepted_sockets[i].accepted_socketFD, mailing_queue, sizeof(mailing_queue), 0);
+        //     }
+        // }
+        //flush the whole queue and send them to MTA
+        memset(mailing_queue, '\0', sizeof(mailing_queue));
+        mail_counting = 0;
+        printf("The queue is flushed successfully!\n");
+        printf("Refreshing our mind .....\n");
+    }
+    Mail mail_copy = *received_email;
+    mailing_queue[mail_counting] = mail_copy;
+    mail_counting ++;
+    printf("Current mail counting: %d\n", mail_counting);
+    // free email after sending copy
+    free_email(received_email);
+    pthread_mutex_unlock(&queue_mutex);
+}
+
+/*
+    @brief: 
+        function that helps server receive message from client
+        and send that to the others client
+    @param: 
+        void* arg
+    @return
+        void*
+*/
+void* receive_and_print_incoming_data(void *arg){
+    int client_socketFD = (int)(intptr_t)arg;
+    while (true)
+    {
+        /*
+            server listens to multiple clients --> need to specify client_socketFD
+        */
+        Mail* received_email = (Mail*)malloc(sizeof(Mail));
+        ssize_t amountWasReceived = recv(client_socketFD, received_email, sizeof(Mail), 0);
+        if (amountWasReceived > 0){
+            print_email(received_email);
+            send_the_received_message_to_the_MTA(received_email, client_socketFD);
+            const char* message = "I got the email cuh";
+            ssize_t send_status = send(client_socketFD, message, strlen(message), 0);
+            if (send_status < 0){
+                perror("Sending message failed");
+                free_email(received_email);
+                break;
+            }
+        }
+        else if (amountWasReceived <= 0){
+            free_email(received_email);
+            break;
+        }
+    }
+    close(client_socketFD);
+    return NULL;
+}
+
+/*
+    @brief: 
+        create a new thread to handle a connection
+    @param:
+        pointer to the struct that contains information about a client
+    @return: 
+        void
+*/
+void receive_and_print_incoming_data_on_seperate_thread(AcceptedSocket* client_socket){
+    pthread_t id;
+    pthread_create(&id, NULL, receive_and_print_incoming_data, (void *)(intptr_t)client_socket->accepted_socketFD);
+    pthread_detach(id);
+}
+
+/*
+    @brief: 
+        accept connection from client and put the connection to the 
+        accept_sockets array.
+        1 connection = 1 thread
+        after accepting 1 connection --> spawn a thread to handle that connection
+    @param: 
+        server_socketFD
+    @return: 
+        void
+*/
+void start_accepting_incoming_connections(int server_socketFD){
+    while (true){
+        /*
+            create seperate thread to send and receive data
+        */
+        AcceptedSocket* client_socket = acceptIncomingConnection(server_socketFD); 
+        accepted_sockets[accepted_socket_counter] = *client_socket;
+        accepted_socket_counter ++;
+        receive_and_print_incoming_data_on_seperate_thread(client_socket);
+    }
 }
 
 /*
@@ -139,7 +297,7 @@ int main(){
     /*
         listen to all incoming traffic on port 2000
     */
-    struct sockaddr_in* server_address = createIPv4Address("", 2000);
+    struct sockaddr_in* server_address = createIPv4Address("127.0.0.1", 2000);
     /*
         bind the server to an address
     */
@@ -163,33 +321,12 @@ int main(){
         exit(EXIT_FAILURE);
     }
     printf("Server is listening.....\n");
-    struct sockaddr_in client_address;
-    socklen_t client_addr_size = sizeof(struct sockaddr_in);
-    int client_socketFD = accept(server_socketFD, (struct sockaddr*)&client_address, &client_addr_size);
-    Mail* received_email = (Mail*)malloc(sizeof(Mail));
-    ssize_t amountWasReceived = recv(client_socketFD, received_email, sizeof(Mail), 0);
-    if (amountWasReceived <= 0){
-        close(client_socketFD);
-        close(server_socketFD);
-        free(server_address);
-        free_email(received_email);
-        exit(EXIT_FAILURE);
-    }
-    print_email(received_email);
-    const char* message = "I got the email cuh";
-    ssize_t send_status = send(client_socketFD, message, strlen(message), 0);
-    if (send_status < 0){
-        perror("Sending message failed");
-        close(client_socketFD);
-        close(server_socketFD);
-        free(server_address);
-        exit(EXIT_FAILURE);
-    }
-    printf("Sent message: %s\n", message);
+    /*
+        receive data from client
+     */
+    start_accepting_incoming_connections(server_socketFD);
     printf("Closing session ....\n");
-    close(client_socketFD);
     close(server_socketFD);
-    free_email(received_email);
     free(server_address);
     return 0;
 }

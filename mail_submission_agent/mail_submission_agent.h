@@ -19,6 +19,7 @@
 #include <sys/types.h>
 
 #define BUFFER_SIZE 4096
+#define QUEUE_SIZE 3
 /*
     Email content define
 */
@@ -72,9 +73,24 @@ typedef struct{
     char* content_type;
 } MIME;
 
+/*
+    struct that stores information about the socket that
+    is accepted by the server socket
+*/
+typedef struct{
+    int accepted_socketFD;
+    struct sockaddr_in address;
+    int error;
+    bool accepted_successfully;
+} AcceptedSocket;
+
 struct sockaddr_in* createIPv4Address(const char*, int);
 int CreateTCPIPv4Socket();
-Mail* create_socket_and_receive_email_from_MUA(int);
+AcceptedSocket* acceptIncomingConnection(int);
+void* receive_and_print_incoming_data(void*);
+void start_accepting_incoming_connections(int);
+void receive_and_print_incoming_data_on_seperate_thread(AcceptedSocket*);
+void send_the_received_message_to_the_MTA(Mail*, int);
 void free_email(Mail*);
 void free_mail_array(Mail**);
 void print_email(Mail*);
