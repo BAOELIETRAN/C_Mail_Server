@@ -29,12 +29,25 @@
             --> temporarily decline new emails and send old emails to MTA
         ONLY STORE AND SEND COPIES!
         Set up the condition to send email to MTA
-    TODO: 
         Change the code so that MSA will be a client connect to MTA
+    TODO:     
         (if the email can reach to the MDA, then the MUA will receive the message
         --> need a chain of response).
+        BUILD MTA
 */
 
+/*
+    SocketFD that is used to connect to MTA
+*/
+int connect_socketFD = -1;
+/*
+    SocketFD that is used to listen to clients
+*/
+int server_socketFD = -1;
+/*
+    server_address that contains information about the server
+*/
+struct sockaddr_in* server_address = NULL;
 /*
     Array of client accepted sockets
 */
@@ -169,26 +182,23 @@ AcceptedSocket* acceptIncomingConnection(int server_socketFD){
 void send_the_received_message_to_the_MTA(Mail* received_email, int client_socketFD){
     pthread_mutex_lock(&queue_mutex);
     if (mail_counting >= QUEUE_SIZE){
-        //release after building MTA
-        // for (int i = 0; i < accepted_socket_counter; i ++){
-        //     /*
-        //         we only want to send email to the MTA server
-        //     */
-        //     struct in_addr target_ip;
-        //     inet_pton(AF_INET, "127.0.0.2", &target_ip);
-        //     if (accepted_sockets[i].address.sin_addr.s_addr == target_ip.s_addr){
-        //         // send the whole mailing queue
-        //         send(accepted_sockets[i].accepted_socketFD, mailing_queue, sizeof(mailing_queue), 0);
-        //     }
-        // }
-        //flush the whole queue and send them to MTA
+        // release after building MTA
+            /*
+                we only want to send email to the MTA server
+            */
+        // send the whole mailing queue
+        // send(connect_socketFD, mailing_queue, sizeof(mailing_queue), 0);
+        // flush the whole queue and send them to MTA
         memset(mailing_queue, '\0', sizeof(mailing_queue));
         mail_counting = 0;
+        printf(GREEN BOLD);    // Set text color and style
         printf("The queue is flushed successfully!\n");
         printf("Refreshing our mind .....\n");
+        printf(DEFAULT_COLOR RESET_BOLD);
     }
     Mail mail_copy = *received_email;
     mailing_queue[mail_counting] = mail_copy;
+    print_email(mailing_queue[mail_counting]);
     mail_counting ++;
     printf("Current mail counting: %d\n", mail_counting);
     // free email after sending copy
@@ -215,7 +225,6 @@ void* receive_and_print_incoming_data(void *arg){
         Mail* received_email = (Mail*)malloc(sizeof(Mail));
         ssize_t amountWasReceived = recv(client_socketFD, received_email, sizeof(Mail), 0);
         if (amountWasReceived > 0){
-            print_email(received_email);
             send_the_received_message_to_the_MTA(received_email, client_socketFD);
             const char* message = "I got the email cuh";
             ssize_t send_status = send(client_socketFD, message, strlen(message), 0);
@@ -275,29 +284,46 @@ void start_accepting_incoming_connections(int server_socketFD){
     @brief: 
         print the content of an email
 */
-void print_email(Mail* mail){
+void print_email(Mail mail){
     printf("---------------------START---------------------------\n");
-    printf("ID: %d\n", mail->id);
+    printf("ID: %d\n", mail.id);
     printf("Header:\n");
-    printf("Title: %s\n", mail->header.title);
-    printf("Sender: %s\n", mail->header.sender);
-    printf("Receiver: %s\n", mail->header.receiver);
+    printf("Title: %s\n", mail.header.title);
+    printf("Sender: %s\n", mail.header.sender);
+    printf("Receiver: %s\n", mail.header.receiver);
     printf("------------------\n");
     printf("Mail Content:\n");
     printf("Content:\n");
-    printf("%s\n", mail->mail_content.content);
+    printf("%s\n", mail.mail_content.content);
     printf("----------------------END---------------------------\n");
 }
 
+void sigint_handler(int signum){
+    printf("\n");
+    printf("Closing session ....\n");
+    close(connect_socketFD);
+    close(server_socketFD);
+    free(server_address);
+    exit(EXIT_SUCCESS);
+}
+
 int main(){
+    // handle Ctrl + C
+    signal(SIGINT, sigint_handler);
+    // handle kill command
+    signal(SIGTERM, sigint_handler);
     /*
         server's socket for listening
     */
-    int server_socketFD = CreateTCPIPv4Socket();
+    server_socketFD = CreateTCPIPv4Socket();
+    /*
+        MSA's socket to connect to the MTA
+    */
+    connect_socketFD = CreateTCPIPv4Socket();
     /*
         listen to all incoming traffic on port 2000
     */
-    struct sockaddr_in* server_address = createIPv4Address("127.0.0.1", 2000);
+    server_address = createIPv4Address("127.0.0.1", 2000);
     /*
         bind the server to an address
     */
@@ -309,8 +335,19 @@ int main(){
         exit(EXIT_FAILURE);
     }
     printf("Server is bound successfully!\n");
+    // struct sockaddr_in* address = createIPv4Address("127.0.0.2", 2000);
+    // /*
+    //     connect to the server
+    // */
+    // int result = connect(connect_socketFD, (struct sockaddr*)address, sizeof(*address));
+    // if (result < 0){
+    //     perror("Connection is unsuccessful!\n");
+    //     free(address);
+    //     close(connect_socketFD);
+    // }
+    // printf("Connection is successful!\n");
     /*
-        After binding, start listening to the incoming sockets
+        After binding and connecting to MTA, start listening to the incoming sockets
         in this situation, server socket can queue up to 10 connections
     */
     int listen_result = listen(server_socketFD, 10);
@@ -323,9 +360,10 @@ int main(){
     printf("Server is listening.....\n");
     /*
         receive data from client
-     */
+    */
     start_accepting_incoming_connections(server_socketFD);
     printf("Closing session ....\n");
+    close(connect_socketFD);
     close(server_socketFD);
     free(server_address);
     return 0;

@@ -683,9 +683,6 @@ void spawn_terminal(){
                     break;
                 }
                 printf("Connection is successful!\n");
-
-                // start_listening_and_print_messages_on_new_thread(socketFD);
-
                 /*
                     send email through socket
                     be careful with this one!
