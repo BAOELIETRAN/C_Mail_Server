@@ -20,8 +20,8 @@
         Create a simple socket to listen and send with MUA
         Receive email from MUA, print it out, and send response back to MUA
         Implement the server socket to be multithread, and each will send to the MTA.
-        127.0.0.1 --> MSA
-        127.0.0.2 --> MTA
+        127.0.0.1 : 2000 --> MSA
+        127.0.0.2 : 2001 --> MTA
         Implement the queue to store email from MUA
         --> if we don't do that here, we need to do that in MTA
         --> when should we send mails in the queue?
@@ -33,6 +33,7 @@
     TODO:     
         (if the email can reach to the MDA, then the MUA will receive the message
         --> need a chain of response).
+        Ensure that each field is in correct order and information is correct
         BUILD MTA
 */
 
@@ -172,7 +173,7 @@ AcceptedSocket* acceptIncomingConnection(int server_socketFD){
 
 /*
     @brief: 
-        send the received email to other clients
+        send the received email to MTA
     @param: 
         received email
         socketFD of the client that we received the message
@@ -192,6 +193,7 @@ void send_the_received_message_to_the_MTA(Mail* received_email, int client_socke
         memset(mailing_queue, '\0', sizeof(mailing_queue));
         mail_counting = 0;
         printf(GREEN BOLD);    // Set text color and style
+        printf("The mailing queue is full, flushing ....\n");
         printf("The queue is flushed successfully!\n");
         printf("Refreshing our mind .....\n");
         printf(DEFAULT_COLOR RESET_BOLD);
@@ -222,11 +224,27 @@ void* receive_and_print_incoming_data(void *arg){
         /*
             server listens to multiple clients --> need to specify client_socketFD
         */
+        const char* message = "";
         Mail* received_email = (Mail*)malloc(sizeof(Mail));
         ssize_t amountWasReceived = recv(client_socketFD, received_email, sizeof(Mail), 0);
         if (amountWasReceived > 0){
-            send_the_received_message_to_the_MTA(received_email, client_socketFD);
-            const char* message = "I got the email cuh";
+            //bonus: if any required field is empty --> reject
+            if (strlen(received_email->header.sender) == 0 && strlen(received_email->header.receiver) == 0){
+                printf("The SENDER and RECEIVER fields are empty, try again!\n");
+                message = "The SENDER and RECEIVER fields are empty, try again!";
+            }
+            else if (strlen(received_email->header.sender) == 0){
+                printf("The SENDER field is empty, try again!\n");
+                message = "The SENDER field is empty, try again!";
+            }
+            else if (strlen(received_email->header.receiver) == 0){
+                printf("The RECEIVER field is empty, try again!\n");
+                message = "The RECEIVER field is empty, try again!";
+            }
+            else{
+                send_the_received_message_to_the_MTA(received_email, client_socketFD);
+                message = "I got the email cuh";
+            }
             ssize_t send_status = send(client_socketFD, message, strlen(message), 0);
             if (send_status < 0){
                 perror("Sending message failed");
@@ -335,7 +353,7 @@ int main(){
         exit(EXIT_FAILURE);
     }
     printf("Server is bound successfully!\n");
-    // struct sockaddr_in* address = createIPv4Address("127.0.0.2", 2000);
+    // struct sockaddr_in* address = createIPv4Address("127.0.0.2", 2001);
     // /*
     //     connect to the server
     // */
