@@ -30,10 +30,11 @@
         ONLY STORE AND SEND COPIES!
         Set up the condition to send email to MTA
         Change the code so that MSA will be a client connect to MTA
+        Ensure that each field is non empty
     TODO:     
         (if the email can reach to the MDA, then the MUA will receive the message
         --> need a chain of response).
-        Ensure that each field is in correct order and information is correct
+        Ensure that each field is in correct format
         BUILD MTA
 */
 
@@ -242,8 +243,27 @@ void* receive_and_print_incoming_data(void *arg){
                 message = "The RECEIVER field is empty, try again!";
             }
             else{
-                send_the_received_message_to_the_MTA(received_email, client_socketFD);
-                message = "I got the email cuh";
+                const char* domain = "@gmail.com";
+                size_t sender_mail_len = strlen(received_email->header.sender);
+                size_t receiver_mail_len = strlen(received_email->header.receiver);
+                size_t domain_len = strlen(domain);
+                if ((sender_mail_len <= domain_len || (strcmp(received_email->header.sender + (sender_mail_len - domain_len), domain) != 0))
+                    && (receiver_mail_len <= domain_len || (strcmp(received_email->header.receiver + (receiver_mail_len - domain_len), domain) != 0))){
+                        printf("The SENDER and RECEIVER fields are in wrong format, try again!\n");
+                        message = "The SENDER and RECEIVER fields are in wrong format, try again!";
+                }
+                else if (sender_mail_len <= domain_len || (strcmp(received_email->header.sender + (sender_mail_len - domain_len), domain) != 0)){
+                    printf("The SENDER field is in wrong format, try again!\n");
+                    message = "The SENDER field is in wrong format, try again!";
+                }
+                else if (receiver_mail_len <= domain_len || (strcmp(received_email->header.receiver + (receiver_mail_len - domain_len), domain) != 0)){
+                    printf("The RECEIVER field is in wrong format, try again!\n");
+                    message = "The RECEIVER field is in wrong format, try again!";
+                }
+                else{
+                    send_the_received_message_to_the_MTA(received_email, client_socketFD);
+                    message = "I got the email cuh";
+                }
             }
             ssize_t send_status = send(client_socketFD, message, strlen(message), 0);
             if (send_status < 0){
