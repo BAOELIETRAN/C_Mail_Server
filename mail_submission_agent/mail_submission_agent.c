@@ -35,7 +35,13 @@
         (if the email can reach to the MDA, then the MUA will receive the message
         --> need a chain of response).
         Ensure that each field is in correct format
-        BUILD MTA
+        BUILD MTA:
+            MTA will have 2 sockets: 
+                one for connecting to MSA
+                one for connecting to MDA
+            MTA will receive the queue, each entry will be a mail
+            Create a queue to store mails from MSA
+            Take emails from this queue and send that to MDA seperately
 */
 
 /*
@@ -336,6 +342,14 @@ void print_email(Mail mail){
     printf("----------------------END---------------------------\n");
 }
 
+/*
+    @brief: 
+        handle Ctrl C --> instead of quitting, clean up first
+    @param: 
+        signum
+    @return: 
+        void
+*/
 void sigint_handler(int signum){
     printf("\n");
     printf("Closing session ....\n");
