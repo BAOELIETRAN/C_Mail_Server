@@ -270,7 +270,7 @@ void* send_email_to_MDA(void* arg){
         print_email(sending_mail);
         // send the email to MDA 
         // in reality, route email to correct MTA and then send to corresponding MDA
-        // send(MTA_socket, sending_mail, sizeof(sending_mail), 0);
+        // send(MTA_socket, &sending_mail, sizeof(sending_mail), 0);
     }
     return NULL;
 }

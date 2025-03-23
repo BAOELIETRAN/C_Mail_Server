@@ -148,6 +148,8 @@ Mail* parse_user_input_and_create_mail(char*);
 void print_email(Mail*);
 void lower_the_string(char*);
 void greeting(char[]);
+void log_in();
+int authenticate(const char*, const char*);
 void spawn_terminal();
 int main(int, char*[]);
 

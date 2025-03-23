@@ -4,9 +4,13 @@
     counting the number of sending mails
 */
 int mail_counting = 0;
+/*
+    logged-in email
+*/
+char logged_in_email[BUFFER_SIZE] = "";
 
 /*
-    22/2/2025:
+    22/3/2025:
     DONE: 
         Create some commands in terminal:
         - Lowercase the tokens
@@ -19,14 +23,18 @@ int mail_counting = 0;
         - Implementing get email command
         - Renaming and Throwing emails into folder (the commented code)
         - Test the code with creating multiple mails
+        - Make the socket connection from MUA to MDA seemless (always open).      
+        - When start the program, each part will start up and connect to each other
+        through sockets
+        - Sent message --> MSA --> MTA --> "sent successfully".
     TODO: 
         - THE COMMAND BETWEEN SERVERS NEED TO BE CAPITALIZED
         - Decide the IP address and port for each server (MSA, MTA, MDA)
     FIX (for send email socket):
-        - Make the socket connection from MUA to MDA seemless (always open). 
-        - When start the program, each part will start up and connect to each other
-        through sockets
-        - Sent message --> MSA --> MTA --> "sent successfully".
+        - Login: email and password
+        - Correct --> terminal
+            - the sender of the mail will be fixed with the logged in email
+        - Wrong --> exit
 */
 
 /*
@@ -222,7 +230,11 @@ char* create_and_edit_file(){
     // copy the content from template.txt to temp file
     char buffer[1024];
     while (fgets(buffer, sizeof(buffer), template)) {
-        fputs(buffer, temp_file);
+        if (strncmp(buffer, "FROM:", 5) == 0) {  
+            fprintf(temp_file, "FROM: %s\n", logged_in_email);
+        } else {
+            fputs(buffer, temp_file);
+        }
     }
     fclose(template);
     fclose(temp_file);
@@ -885,6 +897,138 @@ void spawn_terminal(){
 }
 
 /*
+    @brief: authenticate user
+    @param: username, password
+    @return: result
+*/
+int authenticate(const char *username, const char *password) {
+    FILE *file = fopen("usrpassw", "r");
+    if (file == NULL) {
+        perror("Failed to open the file");
+        return -1;  // Error
+    }
+    char line[BUFFER_SIZE];
+    char stored_user[BUFFER_SIZE], stored_pass[BUFFER_SIZE];
+
+    while (fgets(line, BUFFER_SIZE, file)) {
+        // Remove newline from the read line
+        line[strcspn(line, "\n")] = '\0';
+
+        // Split username and password
+        char *token = strtok(line, ":");
+        if (token != NULL) {
+            strcpy(stored_user, token);
+            token = strtok(NULL, ":");
+            if (token != NULL) {
+                strcpy(stored_pass, token);
+            } else {
+                continue;  // Skip invalid lines
+            }
+        } else {
+            continue;
+        }
+
+        // Check if username and password match
+        if (strcmp(username, stored_user) == 0 && strcmp(password, stored_pass) == 0) {
+            printf("Welcome %s\n", username);
+            fclose(file);
+            return 1;  // Authentication successful
+        }
+    }
+    printf("Your Username or Password does not exist, create one or try again!\n");
+    fclose(file);
+    return 0;  // Authentication failed
+}
+
+/*
+    @brief: signup user
+    @param: username, password
+    @return: void
+*/
+void signup_user(const char *username, const char *password) {
+    FILE *file = fopen("usrpassw", "a");  // Open file in append mode
+    if (file == NULL) {
+        perror("Failed to open the file");
+        exit(EXIT_FAILURE);
+    }
+
+    // Append username and password in "username:password" format
+    fprintf(file, "%s:%s\n", username, password);
+
+    fclose(file);
+    printf("Signup successful! Account created.\n");
+}
+
+/*
+    @brief: ask for user's credential
+    @param: none
+    @return: void
+*/
+void log_in(){
+    int option;
+    while(true){
+        printf("Sign Up or Log In\n");
+        printf("1. Log In\n");
+        printf("2. Sign Up\n");
+        printf("Your choice: ");
+        if (scanf("%d", &option) != 1){
+            perror("Can not read the choice");
+            exit(EXIT_FAILURE);
+        }
+        getchar(); 
+        if (option == 1){
+            char username[BUFFER_SIZE];
+            char password[BUFFER_SIZE];
+            printf("Enter login username: ");
+            if (fgets(username, BUFFER_SIZE, stdin) == NULL){
+                perror("Failed to read the username!");
+                continue;
+            }
+            username[strcspn(username, "\n")] = '\0';
+            printf("Enter login password: ");
+            if (fgets(password, BUFFER_SIZE, stdin) == NULL){
+                perror("Failed to read the password!");
+                continue;
+            }
+            password[strcspn(password, "\n")] = '\0';
+            int result = authenticate(username, password);
+            if (result == 0){
+                continue;
+            }
+            else if (result = 1){
+                strncpy(logged_in_email, username, BUFFER_SIZE);
+                return;
+            }
+            else{
+                exit(EXIT_FAILURE);
+            }
+        }
+        else if (option == 2){
+            char username[BUFFER_SIZE];
+            char password[BUFFER_SIZE];
+            printf("Enter signup username: ");
+            if (fgets(username, BUFFER_SIZE, stdin) == NULL){
+                perror("Failed to read the username!");
+                continue;
+            }
+            username[strcspn(username, "\n")] = '\0';
+            printf("Enter signup password: ");
+            if (fgets(password, BUFFER_SIZE, stdin) == NULL){
+                perror("Failed to read the password!");
+                continue;
+            }
+            password[strcspn(password, "\n")] = '\0';
+            signup_user(username, password);
+            continue;
+        }
+        else{
+            printf("Incorrect option, try again\n");
+            continue;
+        }
+    }
+}
+
+/*
     @brief: 
         print the content of an email
 */
@@ -909,6 +1053,9 @@ void print_email(Mail* mail){
 int main(int argc, char* argv[]){
     char intro[] = "Welcome to Mogwarts University";
     greeting(intro);
+    // sign-up / log-in, then
+    // ask for username + password
+    log_in();
     init_arrs();
     spawn_terminal();
     /*
