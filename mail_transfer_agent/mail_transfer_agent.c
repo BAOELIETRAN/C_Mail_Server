@@ -197,8 +197,6 @@ void* receive_and_push_incoming_data(void *arg){
                 free_email(received_email);
                 break;
             }
-            // //put the function that pop and send to MDA on a seperated thread
-            // send_the_received_message_to_the_other_clients(received_email, client_socketFD);
         }
         else if (amountWasReceived <= 0){
             free_email(received_email);
@@ -270,7 +268,8 @@ void* send_email_to_MDA(void* arg){
         pthread_mutex_unlock(&queue.lock);
         printf("Mail to send: \n");
         print_email(sending_mail);
-        // send the email to MDA
+        // send the email to MDA 
+        // in reality, route email to correct MTA and then send to corresponding MDA
         // send(MTA_socket, sending_mail, sizeof(sending_mail), 0);
     }
     return NULL;
