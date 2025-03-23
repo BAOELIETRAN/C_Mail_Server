@@ -19,42 +19,8 @@
 #include <sys/types.h>
 #include <signal.h>
 
-/* List of colors */
-
-#define BLACK "\033[30m"
-#define RED "\033[31m"
-#define GREEN "\033[32m"
-#define YELLOW "\033[33m"
-#define BLUE "\033[34m"
-#define MAGNETA "\033[35m"
-#define CYAN "\033[36m"
-#define WHITE "\033[37m"
-#define DEFAULT_COLOR "\033[39m"
-
-/* List of formats */
-
-#define BOLD "\033[1m"
-#define RESET_BOLD "\033[22m"  
-
-#define DIM "\033[2m"
-#define RESET_DIM "\033[22m"  
-
-#define ITALIC "\033[3m"
-#define RESET_ITALIC "\033[23m"  
-
-#define UNDERLINE "\033[4m"
-#define RESET_UNDERLINE "\033[24m"  
-
-#define STRIKETHROUGH "\033[9m"
-#define RESET_STRIKETHROUGH "\033[29m" 
-
-/*
-    clear everything on the console
-*/
-#define CLEAR_SCREEN "\033[H\033[J"
-
 #define BUFFER_SIZE 4096
-#define QUEUE_SIZE 3
+
 /*
     Email content define
 */
@@ -130,5 +96,6 @@ void free_email(Mail*);
 void free_mail_array(Mail**);
 void print_email(Mail);
 void sigint_handler(int);
+int main();
 
 #endif
