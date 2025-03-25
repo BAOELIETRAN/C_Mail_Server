@@ -21,6 +21,7 @@
 
 #define BUFFER_SIZE 4096
 #define QUEUE_SIZE 30
+#define WAITING_NUM 30
 /*
     Email content define
 */
@@ -86,28 +87,24 @@ typedef struct{
 } AcceptedSocket;
 
 /*
-    struct that stores email from MSA
+    struct that represent receiver and their mails
 */
 typedef struct{
-    Mail mailing_queue[QUEUE_SIZE];
-    int rear;
-    int front;
-    int count;
-    pthread_mutex_t lock;
-    pthread_cond_t not_empty;
-    pthread_cond_t not_full;
-} Mailing_Queue;
+    Mail* mailing_queue;
+    int mail_count;
+    char receiver[MAX_RECEIVER_LEN]; 
+} User_Mail_List;
 
-void queue_init(Mailing_Queue*);
+
 struct sockaddr_in* createIPv4Address(const char*, int);
 int CreateTCPIPv4Socket();
 void start_accepting_incoming_connections(int);
 AcceptedSocket* acceptIncomingConnection(int);
 void receive_and_push_incoming_data_to_the_queue_on_seperate_thread(AcceptedSocket*);
 void* receive_and_push_incoming_data(void*);
-void* send_email_to_MDA(void*);
 void free_email(Mail*);
 void print_email(Mail);
+void print_entry(User_Mail_List);
 void sigint_handler(int);
 int main();
 

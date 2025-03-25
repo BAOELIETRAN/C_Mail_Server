@@ -270,7 +270,7 @@ void* send_email_to_MDA(void* arg){
         print_email(sending_mail);
         // send the email to MDA 
         // in reality, route email to correct MTA and then send to corresponding MDA
-        // send(MTA_socket, &sending_mail, sizeof(sending_mail), 0);
+        send(MTA_socket, &sending_mail, sizeof(sending_mail), 0);
     }
     return NULL;
 }
@@ -343,17 +343,17 @@ int main(){
     }
     printf("Server is bound successfully!\n");
     // connect to MDA
-    // struct sockaddr_in* address = createIPv4Address("127.0.0.3", 2002);
-    // /*
-    //     connect to the server
-    // */
-    // int result = connect(connect_socketFD, (struct sockaddr*)address, sizeof(*address));
-    // if (result < 0){
-    //     perror("Connection is unsuccessful!\n");
-    //     free(address);
-    //     close(connect_socketFD);
-    // }
-    // printf("Connection is successful!\n");
+    struct sockaddr_in* address = createIPv4Address("127.0.0.3", 2002);
+    /*
+        connect to the server
+    */
+    int result = connect(connect_socketFD, (struct sockaddr*)address, sizeof(*address));
+    if (result < 0){
+        perror("Connection is unsuccessful!\n");
+        free(address);
+        close(connect_socketFD);
+    }
+    printf("Connection is successful!\n");
     /*
         After binding and connecting to MDA, start listening to MSA 
         in this situation, server socket can queue up to 1 connection

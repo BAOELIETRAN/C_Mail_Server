@@ -93,7 +93,6 @@ void start_accepting_incoming_connections(int);
 void receive_and_print_incoming_data_on_seperate_thread(AcceptedSocket*);
 void send_the_received_message_to_the_MTA(Mail*, int);
 void free_email(Mail*);
-void free_mail_array(Mail**);
 void print_email(Mail);
 void sigint_handler(int);
 int main();

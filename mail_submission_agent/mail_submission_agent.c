@@ -80,19 +80,6 @@ void free_email(Mail* email){
 
 /*
     @brief: 
-        free the content inside the array and the whole array
-*/
-void free_mail_array(Mail** Mail_array){
-    for (int i = 0; i < BUFFER_SIZE; i++) {
-        if (Mail_array[i]) {  
-            free_email(Mail_array[i]);  
-        }
-    }
-    free(Mail_array);  
-}
-
-/*
-    @brief: 
         create a sockaddr_in structure with given ip address and port 
     @param: 
         ip - string ip address
