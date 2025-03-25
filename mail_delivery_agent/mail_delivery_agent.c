@@ -165,12 +165,13 @@ void* receive_and_push_incoming_data(void *arg){
         // check for the IP Address --> MTA or clients
         char client_ip[INET_ADDRSTRLEN]; 
         inet_ntop(AF_INET, &client_socket->address.sin_addr, client_ip, INET_ADDRSTRLEN);
-        if (strcmp(client_ip, "127.0.0.2") != 0){
+        if (strcmp(client_ip, "127.0.0.3") == 0){
             amountWasReceived = recv(client_socketFD, received_email, sizeof(Mail), 0);
             is_MTA = true;
         }
         else{
             amountWasReceived = recv(client_socketFD, listen_buffer, BUFFER_SIZE, 0);
+            printf("Tao la client\n");
         }
         if (amountWasReceived > 0){
             /*
@@ -183,6 +184,7 @@ void* receive_and_push_incoming_data(void *arg){
                     care about the size of the mailing queue as well as entry queue
                     --> resize
                 */
+                printf("Asa habibti\n");
                 bool is_entry_exist = false;
                 Mail mail_copy = *received_email;
                 pthread_mutex_lock(&waiting_mutex);
@@ -215,16 +217,17 @@ void* receive_and_push_incoming_data(void *arg){
                     waiting_mail_array[entry_counting] = new_entry;
                     entry_counting ++;
                 }
-                for (int index = 0; index < entry_counting; index ++){
-                    print_entry(waiting_mail_array[index]);
-                }
+                print_entry();
                 pthread_mutex_unlock(&waiting_mutex);
             }
             else{
                 /*
                     take the entry from the queue and send it to the client
                 */
+                bool waiting_status = false;
                 listen_buffer[amountWasReceived] = '\0';
+                printf("Email of user: %s\n", listen_buffer);
+                printf("Whole lotta red\n");
                 const char* message = "";
                 if (entry_counting == 0){
                     message = "There is no email for you right now!";
@@ -237,9 +240,11 @@ void* receive_and_push_incoming_data(void *arg){
                 }
                 else{
                     pthread_mutex_lock(&waiting_mutex);
+                    printf("nigger\n");
                     for (int index = 0; index < entry_counting; index ++){
                         User_Mail_List entry = waiting_mail_array[index];
                         if (strcmp(entry.receiver, listen_buffer) == 0){
+                            waiting_status = true;
                             // making the noti green
                             printf("\033[0;32m%s: Match!\n\033[0m", listen_buffer);
                             // Send the number of emails first
@@ -261,6 +266,15 @@ void* receive_and_push_incoming_data(void *arg){
                             }
 
                             printf("\033[0;32m%s: Mailing queue is sent!\n\033[0m", listen_buffer);
+                        }
+                    }
+                    if (waiting_status == false){
+                        message = "There is no email for you right now!";
+                        ssize_t send_status = send(client_socketFD, message, strlen(message), 0);
+                        if (send_status < 0){
+                            perror("Sending message failed");
+                            free_email(received_email);
+                            break;
                         }
                     }
                     pthread_mutex_unlock(&waiting_mutex);
@@ -309,6 +323,12 @@ void start_accepting_incoming_connections(int server_socketFD){
         AcceptedSocket* client_socket = acceptIncomingConnection(server_socketFD); 
         accepted_sockets[accepted_socket_counter] = *client_socket;
         accepted_socket_counter ++;
+        for (int i = 0; i < accepted_socket_counter; i ++){
+            // check for the IP Address --> MTA or clients
+            char client_ip[INET_ADDRSTRLEN]; 
+            inet_ntop(AF_INET, &accepted_sockets[i].address.sin_addr, client_ip, INET_ADDRSTRLEN);
+            printf("IP cua bo may la: %s\n", client_ip);
+        }
         receive_and_push_incoming_data_to_the_queue_on_seperate_thread(client_socket);
     }
 }
@@ -331,36 +351,31 @@ void sigint_handler(int signum){
 }
 
 /*
-    @brief: 
-        print the content of an email
-*/
-void print_email(Mail mail){
-    printf("---------------------START---------------------------\n");
-    printf("ID: %d\n", mail.id);
-    printf("Header:\n");
-    printf("Title: %s\n", mail.header.title);
-    printf("Sender: %s\n", mail.header.sender);
-    printf("Receiver: %s\n", mail.header.receiver);
-    printf("------------------\n");
-    printf("Mail Content:\n");
-    printf("Content:\n");
-    printf("%s\n", mail.mail_content.content);
-    printf("----------------------END---------------------------\n");
-}
-
-/*
     @brief: print each entry in the waiting array
     @param: none
     @return: void
 */
-void print_entry(User_Mail_List entry){
-    printf("---------------------START_ENTRY---------------------------\n");
-    printf("Receiver: %s\n", entry.receiver);
-    printf("Mail counting: %d\n", entry.mail_count);
-    for (int i = 0; i < entry.mail_count; i ++){
-        print_email(entry.mailing_queue[i]);
+void print_entry(){
+    if (entry_counting == 0) {
+        printf("\033[1;33mNo entries in the waiting mail list.\n\033[0m");
+        return;
     }
-    printf("----------------------END_ENTRY---------------------------\n");
+    printf("----------------------------START_ENTRY-----------------------------------------------------------------\n");
+    printf("%-5s | %-45s | %-30s\n", "Index", " Receiver", "Status"); 
+    printf("--------------------------------------------------------------------------------------------------------\n");
+
+    for (int index = 0; index < entry_counting; index ++) {
+        User_Mail_List entry = waiting_mail_array[index];
+        printf("%-5d | %-45s | ", index + 1, entry.receiver); // Print index and receiver
+
+        // Print status based on mail_count
+        if (entry.mail_count >= 1) {
+            printf("There are %d awaiting emails\n", entry.mail_count);
+        }else {
+            printf("No awaiting emails\n");
+        }
+    }
+    printf("-----------------------------END_ENTRY------------------------------------------------------------------\n");
 }
 
 int main(){
@@ -378,20 +393,17 @@ int main(){
     */
     server_socketFD = CreateTCPIPv4Socket();
     /*
-        listen to all incoming traffic on port 2002
+        Bind MDA to 127.0.0.4:2002
     */
-    server_address = createIPv4Address("127.0.0.3", 2002);
-    /*
-        bind the server to an address
-    */
-    int bind_result = bind(server_socketFD, (struct sockaddr*)server_address, sizeof(*server_address));
-    if (bind_result < 0){
-        perror("Server binding is unsuccessful!\n");
+    struct sockaddr_in* server_address = createIPv4Address("127.0.0.4", 2002);
+    if (bind(server_socketFD, (struct sockaddr*)server_address, sizeof(*server_address)) < 0) {
+        perror("MDA binding is unsuccessful!");
         free(server_address);
         close(server_socketFD);
         exit(EXIT_FAILURE);
     }
-    printf("Server is bound successfully!\n");
+    printf("MDA is bound successfully on 127.0.0.4:2002!\n");
+    free(server_address);
     /*
         After binding and connecting to MTA, start listening to the incoming sockets
         in this situation, server socket can queue up to 10 connections

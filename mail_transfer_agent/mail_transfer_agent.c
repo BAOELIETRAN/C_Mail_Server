@@ -7,7 +7,7 @@
             one for connecting to MSA
             one for connecting to MDA
         (no need to multithread)
-        MTA: 127.0.0.2 : 2001
+        MTA: 127.0.0.3 : 2001
         MTA will receive the queue, each entry will be a mail
         Create a queue to store mails from MSA
         Take emails from this queue and send that to MDA seperately
@@ -145,7 +145,7 @@ AcceptedSocket* acceptIncomingConnection(int server_socketFD){
     // if the connected client is not MSA --> reject
     char client_ip[INET_ADDRSTRLEN]; 
     inet_ntop(AF_INET, &client_address.sin_addr, client_ip, INET_ADDRSTRLEN);
-    if (strcmp(client_ip, "127.0.0.1") != 0){
+    if (strcmp(client_ip, "127.0.0.2") != 0){
         printf("You are not allowed to connect to MTA\n");
         return NULL;
     }
@@ -243,6 +243,12 @@ void start_accepting_incoming_connections(int server_socketFD){
         }
         accepted_sockets[accepted_socket_counter] = *client_socket;
         accepted_socket_counter ++;
+        for (int i = 0; i < accepted_socket_counter; i ++){
+            // check for the IP Address --> MTA or clients
+            char client_ip[INET_ADDRSTRLEN]; 
+            inet_ntop(AF_INET, &accepted_sockets[i].address.sin_addr, client_ip, INET_ADDRSTRLEN);
+            printf("IP cua bo may la: %s\n", client_ip);
+        }
         receive_and_push_incoming_data_to_the_queue_on_seperate_thread(client_socket);
     }
 }
@@ -266,8 +272,6 @@ void* send_email_to_MDA(void* arg){
         queue.count --;
         pthread_cond_signal(&queue.not_full);
         pthread_mutex_unlock(&queue.lock);
-        printf("Mail to send: \n");
-        print_email(sending_mail);
         // send the email to MDA 
         // in reality, route email to correct MTA and then send to corresponding MDA
         send(MTA_socket, &sending_mail, sizeof(sending_mail), 0);
@@ -328,32 +332,39 @@ int main(){
     */
     connect_socketFD = CreateTCPIPv4Socket();
     /*
-        listen to all incoming traffic on port 2001
+        Bind MTA to 127.0.0.3:2001 (listening for MSA)
     */
-    server_address = createIPv4Address("127.0.0.2", 2001);
-    /*
-        bind the server to an address
-    */
-    int bind_result = bind(server_socketFD, (struct sockaddr*)server_address, sizeof(*server_address));
-    if (bind_result < 0){
-        perror("Server binding is unsuccessful!\n");
+    struct sockaddr_in* server_address = createIPv4Address("127.0.0.3", 2001);
+    if (bind(server_socketFD, (struct sockaddr*)server_address, sizeof(*server_address)) < 0) {
+        perror("MTA binding is unsuccessful!");
         free(server_address);
         close(server_socketFD);
         exit(EXIT_FAILURE);
     }
-    printf("Server is bound successfully!\n");
-    // connect to MDA
-    struct sockaddr_in* address = createIPv4Address("127.0.0.3", 2002);
+    printf("MTA is bound successfully on 127.0.0.3:2001!\n");
     /*
-        connect to the server
+        Bind MTA's outgoing connection socket to 127.0.0.3 (let OS choose port)
     */
-    int result = connect(connect_socketFD, (struct sockaddr*)address, sizeof(*address));
-    if (result < 0){
-        perror("Connection is unsuccessful!\n");
-        free(address);
+    struct sockaddr_in* bind_address = createIPv4Address("127.0.0.3", 0);
+    if (bind(connect_socketFD, (struct sockaddr*)bind_address, sizeof(*bind_address)) < 0) {
+        perror("Binding outgoing socket failed");
+        free(bind_address);
         close(connect_socketFD);
+        exit(EXIT_FAILURE);
     }
-    printf("Connection is successful!\n");
+    free(bind_address);
+    /*
+        Connect MTA to MDA at 127.0.0.4:2002
+    */
+    struct sockaddr_in* mda_address = createIPv4Address("127.0.0.4", 2002);
+    if (connect(connect_socketFD, (struct sockaddr*)mda_address, sizeof(*mda_address)) < 0) {
+        perror("Connection to MDA is unsuccessful!");
+        free(mda_address);
+        close(connect_socketFD);
+        exit(EXIT_FAILURE);
+    }
+    printf("Connection to MDA at 127.0.0.4:2002 is successful!\n");
+    free(mda_address);
     /*
         After binding and connecting to MDA, start listening to MSA 
         in this situation, server socket can queue up to 1 connection
@@ -370,7 +381,8 @@ int main(){
         close(server_socketFD);
         exit(EXIT_FAILURE);
     }
-    printf("Server is listening.....\n");
+    printf("MTA is listening on 127.0.0.3:2001.....\n");
+    free(server_address);
     /*
         receive data from client
     */

@@ -142,6 +142,7 @@ void start_listening_and_print_messages_on_new_thread(int);
 void* listen_and_print(void*);
 Mail* create_email(int, char*, char*, char*, char*);
 void free_email(Mail*);
+void init_arrs();
 void free_arrs();
 void free_mail_array(Mail**);
 Mail* parse_user_input_and_create_mail(char*);

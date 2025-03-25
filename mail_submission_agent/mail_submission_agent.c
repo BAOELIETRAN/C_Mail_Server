@@ -20,9 +20,9 @@
         Create a simple socket to listen and send with MUA
         Receive email from MUA, print it out, and send response back to MUA
         Implement the server socket to be multithread, and each will send to the MTA.
-        127.0.0.1 : 2000 --> MSA
-        127.0.0.2 : 2001 --> MTA
-        127.0.0.3 : 2002 --> MDA
+        127.0.0.2 : 2000 --> MSA
+        127.0.0.3 : 2001 --> MTA
+        127.0.0.4 : 2002 --> MDA
         Implement the queue to store email from MUA
         --> if we don't do that here, we need to do that in MTA
         --> when should we send mails in the queue?
@@ -281,6 +281,12 @@ void start_accepting_incoming_connections(int server_socketFD){
         AcceptedSocket* client_socket = acceptIncomingConnection(server_socketFD); 
         accepted_sockets[accepted_socket_counter] = *client_socket;
         accepted_socket_counter ++;
+        for (int i = 0; i < accepted_socket_counter; i ++){
+            // check for the IP Address --> MTA or clients
+            char client_ip[INET_ADDRSTRLEN]; 
+            inet_ntop(AF_INET, &accepted_sockets[i].address.sin_addr, client_ip, INET_ADDRSTRLEN);
+            printf("IP cua bo may la: %s\n", client_ip);
+        }
         receive_and_print_incoming_data_on_seperate_thread(client_socket);
     }
 }
@@ -334,45 +340,52 @@ int main(){
     */
     connect_socketFD = CreateTCPIPv4Socket();
     /*
-        listen to all incoming traffic on port 2000
+        Bind the server socket to 127.0.0.2:2000
     */
-    server_address = createIPv4Address("127.0.0.1", 2000);
-    /*
-        bind the server to an address
-    */
-    int bind_result = bind(server_socketFD, (struct sockaddr*)server_address, sizeof(*server_address));
-    if (bind_result < 0){
-        perror("Server binding is unsuccessful!\n");
+    struct sockaddr_in* server_address = createIPv4Address("127.0.0.2", 2000);
+    if (bind(server_socketFD, (struct sockaddr*)server_address, sizeof(*server_address)) < 0) {
+        perror("Server binding is unsuccessful!");
         free(server_address);
         close(server_socketFD);
         exit(EXIT_FAILURE);
     }
-    printf("Server is bound successfully!\n");
-    struct sockaddr_in* address = createIPv4Address("127.0.0.2", 2001);
+    printf("Server is bound successfully on 127.0.0.2:2000!\n");
     /*
-        connect to the server
+        Bind the outgoing connection socket to 127.0.0.2 (let OS choose port)
     */
-    int result = connect(connect_socketFD, (struct sockaddr*)address, sizeof(*address));
-    if (result < 0){
-        perror("Connection is unsuccessful!\n");
-        free(address);
+    struct sockaddr_in* bind_address = createIPv4Address("127.0.0.2", 0);
+    if (bind(connect_socketFD, (struct sockaddr*)bind_address, sizeof(*bind_address)) < 0) {
+        perror("Binding outgoing socket failed");
+        free(bind_address);
         close(connect_socketFD);
+        exit(EXIT_FAILURE);
     }
-    printf("Connection is successful!\n");
+    free(bind_address);
     /*
-        After binding and connecting to MTA, start listening to the incoming sockets
-        in this situation, server socket can queue up to 10 connections
+        Connect to MTA at 127.0.0.3:2001
     */
-    int listen_result = listen(server_socketFD, 10);
-    if (listen_result < 0){
-        perror("Server listening is unsuccessful!\n");
+    struct sockaddr_in* mta_address = createIPv4Address("127.0.0.3", 2001);
+    if (connect(connect_socketFD, (struct sockaddr*)mta_address, sizeof(*mta_address)) < 0) {
+        perror("Connection to MTA is unsuccessful!");
+        free(mta_address);
+        close(connect_socketFD);
+        exit(EXIT_FAILURE);
+    }
+    printf("Connection to MTA at 127.0.0.3:2001 is successful!\n");
+    free(mta_address);
+    /*
+        Start listening for incoming client connections (queue size: 10)
+    */
+    if (listen(server_socketFD, 10) < 0) {
+        perror("Server listening is unsuccessful!");
         free(server_address);
         close(server_socketFD);
         exit(EXIT_FAILURE);
     }
-    printf("Server is listening.....\n");
+    printf("Server is listening on 127.0.0.2:2000.....\n");
+    free(server_address);
     /*
-        receive data from client
+        Receive data from client
     */
     start_accepting_incoming_connections(server_socketFD);
     return 0;

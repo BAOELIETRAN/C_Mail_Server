@@ -103,8 +103,7 @@ AcceptedSocket* acceptIncomingConnection(int);
 void receive_and_push_incoming_data_to_the_queue_on_seperate_thread(AcceptedSocket*);
 void* receive_and_push_incoming_data(void*);
 void free_email(Mail*);
-void print_email(Mail);
-void print_entry(User_Mail_List);
+void print_entry();
 void sigint_handler(int);
 int main();
 
