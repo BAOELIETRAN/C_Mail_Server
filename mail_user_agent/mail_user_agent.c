@@ -1078,11 +1078,6 @@ int main(int argc, char* argv[]){
         check lại xem các condition đã đủ chưa
         exit có bị leak memory ko
     */
-    for (int i = 0; i < cur_recv_index; i ++){
-        print_email(&MDA_array[i]);
-    }
-    free_arrs();
-
     // free(MDA_array);
     close(send_mail_socket_FD);
     close(get_mail_socket_FD);
