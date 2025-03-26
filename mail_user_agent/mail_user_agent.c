@@ -16,6 +16,10 @@ int send_mail_socket_FD = -1;
     socket to connect to MDA
 */
 int get_mail_socket_FD = -1;
+/*
+    array to receive email from MDA
+*/
+Mail* MDA_array = NULL;
 
 /*
     22/3/2025:
@@ -699,27 +703,6 @@ void spawn_terminal(){
                     return the number of bytes sent. 
                     Otherwise, -1 shall be returned and errno set to indicate the error
                 */  
-                // /*
-                //     if socketFD > 0 --> socket created successfully
-                // */
-                // send_mail_socket_FD = CreateTCPIPv4Socket();
-                // if (send_mail_socket_FD <= 0){
-                //     perror("Socket is created unsuccessfully!\n");
-                //     break;
-                // }
-                // struct sockaddr_in* address = createIPv4Address("127.0.0.2", 2000);
-                // /*
-                //     connect to the server
-                // */
-                // int result = connect(send_mail_socket_FD, (struct sockaddr*)address, sizeof(*address));
-                // if (result < 0){
-                //     perror("Connection is unsuccessful!\n");
-                //     free(address);
-                //     close(send_mail_socket_FD);
-                //     break;
-                // }
-                // printf("Connection is successful!\n");
-                // free(address);
                 Mail* email = draft_email;
                 ssize_t send_status = send(send_mail_socket_FD, email, sizeof(Mail), 0);
                 if (send_status < 0) {
@@ -782,33 +765,10 @@ void spawn_terminal(){
         */
         else if (strcmp(first_token, "get") == 0){
             if (strcmp(second_token, "mail") == 0){
-                // /*
-                //     socket to connect to MDA server
-                // */
-                // int get_mail_socket_FD = CreateTCPIPv4Socket();
-                // if (get_mail_socket_FD <= 0){
-                //     perror("Socket is created unsuccessfully!\n");
-                //     free(MDA_array);
-                //     return NULL;
-                // }
-                // struct sockaddr_in* address = createIPv4Address("127.0.0.4", 2002);
-                // /*
-                //     connect to the server
-                // */
-                // int result = connect(get_mail_socket_FD, (struct sockaddr*)address, sizeof(*address));
-                // if (result < 0){
-                //     perror("Connection is unsuccessful!\n");
-                //     free(address);
-                //     free(MDA_array);
-                //     close(get_mail_socket_FD);
-                //     return NULL;
-                // }
-                // printf("Connection is successful!\n");
-                // free(address);
                 /*
                     array of received email
                 */
-                Mail* MDA_array = (Mail*)malloc(BUFFER_SIZE * sizeof(Mail));
+                MDA_array = (Mail*)malloc(BUFFER_SIZE * sizeof(Mail));
                 ssize_t send_status = send(get_mail_socket_FD, logged_in_email, strlen(logged_in_email), 0);
                 if (send_status < 0){
                     perror("Message sent failed");
@@ -816,7 +776,6 @@ void spawn_terminal(){
                     // close(get_mail_socket_FD);
                     continue;
                 }
-                printf("%s\n", logged_in_email);
                 /*
                     2 scenarios: 
                         success: mail count + mail queue
@@ -843,23 +802,14 @@ void spawn_terminal(){
                     // close(get_mail_socket_FD);
                     continue;
                 }
-                printf("adios\n");
                 /*
                     if there is mail count + queue (something to receive)
                 */
-                /* Receive the number of emails first */
+                /*
+                    set the email count here and send to MDA: receive it!
+                */
                 int email_count = 0;
                 memcpy(&email_count, listen_buffer, sizeof(int)); // Copy int from buffer
-                printf("fomdj\n");
-                ssize_t recv_status = recv(get_mail_socket_FD, &email_count, sizeof(int), 0);
-                printf("Email count: %d\n", email_count);
-                if (recv_status < 0) {
-                    perror("Receive failed");
-                    free(MDA_array);
-                    // close(get_mail_socket_FD);
-                    continue;
-                }
-                
                 if (email_count >= BUFFER_SIZE){
                     Mail* temp_arr = (Mail*)realloc(MDA_array, 2 * BUFFER_SIZE * sizeof(Mail));
                     if (temp_arr == NULL) {
@@ -870,7 +820,16 @@ void spawn_terminal(){
                     }
                     MDA_array = temp_arr;
                 }
-                printf("Homoxide\n");
+                /*
+                    send a message to MDA
+                */
+                char interlude[BUFFER_SIZE] = "";
+                ssize_t interlude_status = send(get_mail_socket_FD, interlude, BUFFER_SIZE, 0);
+                if (interlude_status < 0) {
+                    perror("Sending message to MDA failed");
+                    free(MDA_array);
+                    continue;
+                }
                 /*
                     Receive the queue of mails here
                 */
@@ -881,9 +840,10 @@ void spawn_terminal(){
                     // close(get_mail_socket_FD);
                     continue;
                 }
-                printf("habibi\n");
                 for (int i = 0; i < email_count; i ++){
+                    //segfault since MDA free --> recv_arr point to null
                     recv_arr[i] = &MDA_array[i];
+                    // print_email(&MDA_array[i]);
                     printf("amigos\n");
                     cur_recv_index ++;
                     // If cur_recv_index is greater than or equal to BUFFER_SIZE, we need to reallocate
@@ -899,7 +859,6 @@ void spawn_terminal(){
                         recv_arr = temp_arr;
                     }
                 }  
-                free(MDA_array);
             }
             else{
                 printf("The command is not correct, try again!\n");
@@ -1116,6 +1075,7 @@ int main(int argc, char* argv[]){
         exit có bị leak memory ko
     */
     free_arrs();
+    free(MDA_array);
     close(send_mail_socket_FD);
     close(get_mail_socket_FD);
     return 0;

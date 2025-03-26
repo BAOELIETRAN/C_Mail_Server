@@ -178,7 +178,7 @@ void* receive_and_push_incoming_data(void *arg){
             listen message (not mail) here
             This message is expected to be the email
         */
-        char listen_buffer[BUFFER_SIZE];
+        char listen_buffer[BUFFER_SIZE] = "";
         bool is_MTA = false;
         Mail* received_email = (Mail*)malloc(sizeof(Mail));
         ssize_t amountWasReceived = 0;
@@ -191,7 +191,6 @@ void* receive_and_push_incoming_data(void *arg){
         }
         else{
             amountWasReceived = recv(client_socketFD, listen_buffer, BUFFER_SIZE, 0);
-            printf("Tao la client\n");
         }
         if (amountWasReceived > 0){
             /*
@@ -204,7 +203,6 @@ void* receive_and_push_incoming_data(void *arg){
                     care about the size of the mailing queue as well as entry queue
                     --> resize
                 */
-                printf("Asa habibti\n");
                 bool is_entry_exist = false;
                 Mail mail_copy = *received_email;
                 pthread_mutex_lock(&waiting_mutex);
@@ -265,7 +263,6 @@ void* receive_and_push_incoming_data(void *arg){
                         trim_whitespace(entry->receiver);
                         printf("Entry receiver: %s\n", entry->receiver);
                         if (strcmp(entry->receiver, listen_buffer) == 0){
-                            sleep(5);
                             waiting_status = true;
                             // making the noti green
                             printf("\033[0;32m%s: Match!\n\033[0m", listen_buffer);
@@ -273,6 +270,14 @@ void* receive_and_push_incoming_data(void *arg){
                             ssize_t send_status = send(client_socketFD, &entry->mail_count, sizeof(entry->mail_count), 0);
                             if (send_status < 0) {
                                 perror("Sending mail count failed");
+                                free_email(received_email);
+                                break;
+                            }
+                            //listen to the client here
+                            char interlude[BUFFER_SIZE] = "";
+                            ssize_t interlude_status = recv(client_socketFD, interlude, BUFFER_SIZE, 0);
+                            if (interlude_status < 0) {
+                                perror("Listening message from client failed");
                                 free_email(received_email);
                                 break;
                             }
