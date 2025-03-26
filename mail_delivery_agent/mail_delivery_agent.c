@@ -205,7 +205,6 @@ void* receive_and_push_incoming_data(void *arg){
                 */
                 bool is_entry_exist = false;
                 Mail mail_copy = *received_email;
-                printf("Mail receiver: %s\n", mail_copy.header.receiver);
                 trim_whitespace(mail_copy.header.receiver);
                 pthread_mutex_lock(&waiting_mutex);
                 for (int index = 0; index < entry_counting; index ++){
@@ -247,7 +246,6 @@ void* receive_and_push_incoming_data(void *arg){
                 bool waiting_status = false;
                 listen_buffer[strcspn(listen_buffer, "\n")] = '\0';
                 trim_whitespace(listen_buffer);
-                printf("Email of user: %s\n", listen_buffer);
                 const char* message = "";
                 if (entry_counting == 0){
                     message = "There is no email for you right now!";
@@ -263,7 +261,6 @@ void* receive_and_push_incoming_data(void *arg){
                     for (int index = 0; index < entry_counting; index ++){
                         User_Mail_List* entry = &waiting_mail_array[index];
                         trim_whitespace(entry->receiver);
-                        printf("Entry receiver: %s\n", entry->receiver);
                         if (strcmp(entry->receiver, listen_buffer) == 0){
                             waiting_status = true;
                             // making the noti green
@@ -352,12 +349,6 @@ void start_accepting_incoming_connections(int server_socketFD){
         AcceptedSocket* client_socket = acceptIncomingConnection(server_socketFD); 
         accepted_sockets[accepted_socket_counter] = *client_socket;
         accepted_socket_counter ++;
-        for (int i = 0; i < accepted_socket_counter; i ++){
-            // check for the IP Address --> MTA or clients
-            char client_ip[INET_ADDRSTRLEN]; 
-            inet_ntop(AF_INET, &accepted_sockets[i].address.sin_addr, client_ip, INET_ADDRSTRLEN);
-            printf("IP cua bo may la: %s\n", client_ip);
-        }
         receive_and_push_incoming_data_to_the_queue_on_seperate_thread(client_socket);
     }
 }

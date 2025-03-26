@@ -23,7 +23,7 @@
             Take emails from this queue and send that to MDA seperately
             Receive mail from MSA and store in a queue (1st thread) --> pop it and 
             --> send to MDA (2nd thread)
-            send to MDA every 3 seconds
+            send to MDA every 10 seconds
 */
 
 /*
@@ -247,7 +247,7 @@ void start_accepting_incoming_connections(int server_socketFD){
             // check for the IP Address --> MTA or clients
             char client_ip[INET_ADDRSTRLEN]; 
             inet_ntop(AF_INET, &accepted_sockets[i].address.sin_addr, client_ip, INET_ADDRSTRLEN);
-            printf("IP cua bo may la: %s\n", client_ip);
+            printf("My IP address is: %s\n", client_ip);
         }
         receive_and_push_incoming_data_to_the_queue_on_seperate_thread(client_socket);
     }
@@ -307,7 +307,10 @@ void print_email(Mail mail){
 */
 void sigint_handler(int signum){
     printf("\n");
-    pthread_mutex_destroy(&queue.lock);
+    pthread_cond_broadcast(&queue.not_empty); // Wake up all waiting threads
+    pthread_cond_broadcast(&queue.not_full);
+    pthread_mutex_unlock(&queue.lock);  // Unlock so threads can proceed
+    pthread_mutex_destroy(&queue.lock); // Now it's safe to destroy
     pthread_cond_destroy(&queue.not_empty);
     pthread_cond_destroy(&queue.not_full);
     printf("Closing session ....\n");
@@ -341,7 +344,7 @@ int main(){
         close(server_socketFD);
         exit(EXIT_FAILURE);
     }
-    printf("MTA is bound successfully on 127.0.0.3:2001!\n");
+    printf("MTA server is bound successfully on 127.0.0.3 : 2001!\n");
     /*
         Bind MTA's outgoing connection socket to 127.0.0.3 (let OS choose port)
     */
@@ -354,7 +357,7 @@ int main(){
     }
     free(bind_address);
     /*
-        Connect MTA to MDA at 127.0.0.4:2002
+        Connect MTA to MDA at 127.0.0.4 : 2002
     */
     struct sockaddr_in* mda_address = createIPv4Address("127.0.0.4", 2002);
     if (connect(connect_socketFD, (struct sockaddr*)mda_address, sizeof(*mda_address)) < 0) {
@@ -363,7 +366,7 @@ int main(){
         close(connect_socketFD);
         exit(EXIT_FAILURE);
     }
-    printf("Connection to MDA at 127.0.0.4:2002 is successful!\n");
+    printf("Connect to MDA server at 127.0.0.4 : 2002 is successful!\n");
     free(mda_address);
     /*
         After binding and connecting to MDA, start listening to MSA 
@@ -381,7 +384,7 @@ int main(){
         close(server_socketFD);
         exit(EXIT_FAILURE);
     }
-    printf("MTA is listening on 127.0.0.3:2001.....\n");
+    printf("MTA server is listening on 127.0.0.3 : 2001.....\n");
     free(server_address);
     /*
         receive data from client

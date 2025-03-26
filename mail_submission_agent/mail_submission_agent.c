@@ -1,20 +1,6 @@
 #include "mail_submission_agent.h"
 
 /*
-    Sent message --> MSA --> MTA --> MDA --> "sent successfully".
-    "sent successfully" --> MTA --> MSA --> MUA
-*/
-
-/*
-    expect the socket of MSA opens continuously
-    --> seemless connection --> socket always open
-    receive the email --> put it in the queue
-    if the MTA is working --> send that
-    not working --> send to client that break down
-    --> dont need the send status in MUA
-*/
-
-/*
     16/3/2025:
     DONE:
         Create a simple socket to listen and send with MUA
@@ -71,6 +57,10 @@ pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 /*
     @brief: 
         the email after done using
+    @param: 
+        pointer to the email
+    @return: 
+        void
 */
 void free_email(Mail* email){
     if (email){
@@ -180,6 +170,7 @@ void send_the_received_message_to_the_MTA(Mail* received_email, int client_socke
     @brief: 
         function that helps server receive message from client
         and send that to the others client
+        Also check that if the Mail is formatted correctly or not
     @param: 
         void* arg
     @return
@@ -285,7 +276,7 @@ void start_accepting_incoming_connections(int server_socketFD){
             // check for the IP Address --> MTA or clients
             char client_ip[INET_ADDRSTRLEN]; 
             inet_ntop(AF_INET, &accepted_sockets[i].address.sin_addr, client_ip, INET_ADDRSTRLEN);
-            printf("IP cua bo may la: %s\n", client_ip);
+            printf("My IP address is: %s\n", client_ip);
         }
         receive_and_print_incoming_data_on_seperate_thread(client_socket);
     }
@@ -349,7 +340,7 @@ int main(){
         close(server_socketFD);
         exit(EXIT_FAILURE);
     }
-    printf("Server is bound successfully on 127.0.0.2:2000!\n");
+    printf("MSA server is bound successfully on 127.0.0.2 : 2000!\n");
     /*
         Bind the outgoing connection socket to 127.0.0.2 (let OS choose port)
     */
@@ -371,7 +362,7 @@ int main(){
         close(connect_socketFD);
         exit(EXIT_FAILURE);
     }
-    printf("Connection to MTA at 127.0.0.3:2001 is successful!\n");
+    printf("Connection to MTA server at 127.0.0.3 : 2001 is successful!\n");
     free(mta_address);
     /*
         Start listening for incoming client connections (queue size: 10)
@@ -382,7 +373,7 @@ int main(){
         close(server_socketFD);
         exit(EXIT_FAILURE);
     }
-    printf("Server is listening on 127.0.0.2:2000.....\n");
+    printf("MSA server is listening on 127.0.0.2 : 2000.....\n");
     free(server_address);
     /*
         Receive data from client

@@ -22,7 +22,7 @@ int get_mail_socket_FD = -1;
 Mail* MDA_array = NULL;
 
 /*
-    22/3/2025:
+    26/3/2025:
     DONE: 
         Create some commands in terminal:
         - Lowercase the tokens
@@ -50,11 +50,11 @@ Mail* MDA_array = NULL;
         - after printing adios, wait for a while, then print fomdj, and do nothing
         (being blocked?).
         (if MDA match email --> sleep 5 seconds --> send number)
-    TODO: 
-        - THE COMMAND BETWEEN SERVERS NEED TO BE CAPITALIZED
-        - Decide the IP address and port for each server (MSA, MTA, MDA)
-    FIX:
         - list receive for the first time works fine, but fails on the second time
+        - Decide the IP address and port for each server (MSA, MTA, MDA)
+        - free(MDA array) got issue
+    TODO: 
+        - CLEAN UP and WRITE DOCUMENTATION  
 */
 
 /*
@@ -89,7 +89,11 @@ Mail* MDA_array = NULL;
         Ex: len(src) > len(dest)
             char src[] = "HelloWorld";
             char dest[5];
-            strncpy(dest, src, 5);  // dest will be "Hello", but NOT null-terminated    
+            strncpy(dest, src, 5);  // dest will be "Hello", but NOT null-terminated  
+    @param: 
+        fields in an email
+    @return: 
+        pointer to the newly created email  
 */
 Mail* create_email(int id, char* title, char* sender, char* receiver, char* content) {
     Mail* email = (Mail*)malloc(sizeof(Mail));
@@ -118,6 +122,10 @@ Mail* create_email(int id, char* title, char* sender, char* receiver, char* cont
 /*
     @brief: 
         the email after done using
+    @param: 
+        pointer to the email
+    @return: 
+        void
 */
 void free_email(Mail* email){
     if (email){
@@ -128,6 +136,10 @@ void free_email(Mail* email){
 /*
     @brief: 
         init cur_send_index and cur_recv_index arrays
+    @param: 
+        none
+    @return: 
+        void
 */
 void init_arrs(){
     cur_send_index = 0;
@@ -147,22 +159,13 @@ void init_arrs(){
 }
 
 /*
-    @brief: 
-        free the content inside the array and the whole array
-*/
-void free_mail_array(Mail** Mail_array){
-    for (int i = 0; i < BUFFER_SIZE; i++) {
-        if (Mail_array[i]) {  
-            free_email(Mail_array[i]);  
-        }
-    }
-    free(Mail_array);  
-}
-
-/*
     @brief:  
         free the content of cur_send and cur_receive
         reset send and receive information to default
+    @param:
+        none
+    @return: 
+        none
 */
 void free_arrs() {
     /*
@@ -197,6 +200,10 @@ void free_arrs() {
 /*
     @brief: 
         create a file, open it in an editor, and return the filename
+    @param: 
+        none
+    @return: 
+        newly created file (or new draft mail)
 */
 char* create_and_edit_file(){
     int file_descriptor;
@@ -271,7 +278,7 @@ char* create_and_edit_file(){
 
 /*
     @brief: 
-        the user input and create an email based on that information
+        create an email based on information contained in the file
     @attention: 
         strcspn --> calculate the length of the initial segment of the string 
         that does not contain any character from the set 
@@ -281,6 +288,10 @@ char* create_and_edit_file(){
         --> append at most n characters from src to dest
         --> ensure dest remains null-terminated
         --> if the length of the source string exceeds the remaining space --> overflow
+    @param: 
+        the pointer to the name of the file
+    @return: 
+        a mail created given information in the file
 */
 Mail* parse_user_input_and_create_mail(char* file_name){
     FILE* file_pointer = fopen(file_name, "r");
@@ -332,6 +343,14 @@ Mail* parse_user_input_and_create_mail(char* file_name){
     return new_email;
 }
 
+/*
+    @brief:    
+        create greeting effect
+    @param: 
+        none
+    @return: 
+        none
+*/
 void greeting(char intro[]) {
     int len = strlen(intro);
     int index = 0;
@@ -363,6 +382,10 @@ void greeting(char intro[]) {
 /*
     @brief:
         turn the string in the memory to lowercase
+    @param: 
+        the string that will be lowercased
+    @return: 
+        none
 */
 void lower_the_string(char* string){
     char* pointer = string;
@@ -419,50 +442,6 @@ struct sockaddr_in* createIPv4Address(const char* ip, int port){
 
 /*
     @brief: 
-        listen to message and print message on new thread
-    @param: 
-        file descriptor of the socket of a client
-    @return: 
-        None
-*/
-void start_listening_and_print_messages_on_new_thread(int socketFD){
-    pthread_t id;
-    pthread_create(&id, NULL, listen_and_print, (void *)(intptr_t)socketFD);
-    pthread_detach(id);
-}
-
-/*
-    @brief: 
-        listen and print message
-    @param: 
-        void pointer to argument 
-    @return: 
-        void pointer
-*/
-void* listen_and_print(void *arg){
-    int socketFD = (int)(intptr_t)arg;
-    char buffer[1024];
-    while (true){
-        /*
-            server listens to multiple clients --> need to specify client_socketFD
-        */
-        ssize_t amountWasReceived = recv(socketFD, buffer, 1024, 0);
-        if (amountWasReceived > 0)
-        {
-            buffer[amountWasReceived] = '\0';
-            printf("Response was: %s\n", buffer);
-        }
-        else if (amountWasReceived <= 0)
-        {
-            break;
-        }
-    }
-    close(socketFD);
-    return NULL;
-}
-
-/*
-    @brief: 
         return a file descriptor for a new IPv4 socket 
 */
 int CreateTCPIPv4Socket(){
@@ -472,6 +451,10 @@ int CreateTCPIPv4Socket(){
 /*
     @brief: 
         spawn the terminal to ask for user inputs and display outputs
+    @param: 
+        none
+    @return: 
+        none
 */
 void spawn_terminal(){
     /*
@@ -695,7 +678,6 @@ void spawn_terminal(){
                         --> if the array is out of space --> realloc
                         --> free the draft email
                 */
-
                 /*
                     send email through socket
                     be careful with this one!
@@ -708,7 +690,6 @@ void spawn_terminal(){
                 ssize_t send_status = send(send_mail_socket_FD, email, sizeof(Mail), 0);
                 if (send_status < 0) {
                     perror("Message sending failed");
-                    // close(send_mail_socket_FD);
                     continue;
                 } 
                 printf("Email sent successfully\n");
@@ -723,10 +704,8 @@ void spawn_terminal(){
                 }
                 else if (amountWasReceived <= 0){
                     perror("Message receiving failed");
-                    // close(send_mail_socket_FD);
                     continue;
                 }
-                // close(send_mail_socket_FD);
                 /*
                     --> add the draft email to send array
                     --> increase the send index
@@ -775,7 +754,6 @@ void spawn_terminal(){
                 if (send_status < 0){
                     perror("Message sent failed");
                     free(MDA_array);
-                    // close(get_mail_socket_FD);
                     continue;
                 }
                 /*
@@ -791,7 +769,6 @@ void spawn_terminal(){
                 if (amountWasReceived <= 0){
                     perror("Message receiving failed");
                     free(MDA_array);
-                    // close(get_mail_socket_FD);
                     continue;
                 }
                 listen_buffer[amountWasReceived] = '\0';
@@ -801,7 +778,6 @@ void spawn_terminal(){
                 if (strcmp(listen_buffer, "There is no email for you right now!") == 0) {
                     printf("\033[1;33m%s\033[0m\n", listen_buffer); // Print in yellow
                     free(MDA_array);
-                    // close(get_mail_socket_FD);
                     continue;
                 }
                 /*
@@ -839,7 +815,6 @@ void spawn_terminal(){
                 if (mail_queue_recv_status < 0) {
                     perror("Receive failed");
                     free(MDA_array);
-                    // close(get_mail_socket_FD);
                     continue;
                 }
                 cur_recv_index = email_count;
@@ -859,8 +834,6 @@ void spawn_terminal(){
                     //first segfault since MDA free --> recv_arr point to null
                     recv_arr[i] = NULL;
                     recv_arr[i] = &MDA_array[i];
-                    // print_email(&MDA_array[i]);
-                    printf("amigos\n");
                     //cur index increase incorrectly --> lead to second segment fault
                 }  
             }
@@ -1074,11 +1047,8 @@ int main(int argc, char* argv[]){
     }
     printf("Connection to MDA is successful!\n");
     spawn_terminal();
-    /*
-        check lại xem các condition đã đủ chưa
-        exit có bị leak memory ko
-    */
-    // free(MDA_array);
+    free(MDA_array);
+    printf("Thank you for using Elie Tran Mail Server!\n");
     close(send_mail_socket_FD);
     close(get_mail_socket_FD);
     return 0;

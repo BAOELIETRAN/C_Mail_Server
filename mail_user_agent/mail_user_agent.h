@@ -66,11 +66,6 @@ specified version are available.
 #define CLEAR_SCREEN "\033[H\033[J"
 
 /*
-    counting the order of sending mails
-*/
-int mail_counting;
-
-/*
     define an email
     Two components of an email:
     1. Header
@@ -135,22 +130,18 @@ Mail** recv_arr;
 
 struct sockaddr_in* createIPv4Address(const char*, int);
 int CreateTCPIPv4Socket();
-/*
-    optional
-*/
-void start_listening_and_print_messages_on_new_thread(int);
-void* listen_and_print(void*);
 Mail* create_email(int, char*, char*, char*, char*);
 void free_email(Mail*);
 void init_arrs();
 void free_arrs();
-void free_mail_array(Mail**);
+char* create_and_edit_file();
 Mail* parse_user_input_and_create_mail(char*);
 void print_email(Mail*);
 void lower_the_string(char*);
 void greeting(char[]);
 void log_in();
 int authenticate(const char*, const char*);
+void signup_user(const char*, const char*);
 void spawn_terminal();
 int main(int, char*[]);
 
