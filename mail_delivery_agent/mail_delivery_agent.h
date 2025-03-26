@@ -95,7 +95,7 @@ typedef struct{
     char receiver[MAX_RECEIVER_LEN]; 
 } User_Mail_List;
 
-
+void trim_whitespace(char*);
 struct sockaddr_in* createIPv4Address(const char*, int);
 int CreateTCPIPv4Socket();
 void start_accepting_incoming_connections(int);

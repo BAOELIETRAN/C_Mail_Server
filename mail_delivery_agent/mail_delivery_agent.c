@@ -59,6 +59,26 @@ void free_email(Mail* email){
 }
 
 /*
+    @brief: trim the white space of the string
+    @param: string
+    @return: void
+*/
+void trim_whitespace(char *str) {
+    int start = 0, end = strlen(str) - 1;
+
+    // Trim leading whitespace
+    while (isspace((unsigned char)str[start])) start++;
+
+    // Trim trailing whitespace
+    while (end > start && isspace((unsigned char)str[end])) end--;
+
+    // Shift trimmed string to the beginning
+    int length = end - start + 1;
+    memmove(str, str + start, length);
+    str[length] = '\0';  // Null-terminate the string
+}
+
+/*
     @brief: 
         create a sockaddr_in structure with given ip address and port 
     @param: 
@@ -225,9 +245,9 @@ void* receive_and_push_incoming_data(void *arg){
                     take the entry from the queue and send it to the client
                 */
                 bool waiting_status = false;
-                listen_buffer[amountWasReceived] = '\0';
+                listen_buffer[strcspn(listen_buffer, "\n")] = '\0';
+                trim_whitespace(listen_buffer);
                 printf("Email of user: %s\n", listen_buffer);
-                printf("Whole lotta red\n");
                 const char* message = "";
                 if (entry_counting == 0){
                     message = "There is no email for you right now!";
@@ -240,25 +260,27 @@ void* receive_and_push_incoming_data(void *arg){
                 }
                 else{
                     pthread_mutex_lock(&waiting_mutex);
-                    printf("nigger\n");
                     for (int index = 0; index < entry_counting; index ++){
-                        User_Mail_List entry = waiting_mail_array[index];
-                        if (strcmp(entry.receiver, listen_buffer) == 0){
+                        User_Mail_List* entry = &waiting_mail_array[index];
+                        trim_whitespace(entry->receiver);
+                        printf("Entry receiver: %s\n", entry->receiver);
+                        if (strcmp(entry->receiver, listen_buffer) == 0){
+                            sleep(5);
                             waiting_status = true;
                             // making the noti green
                             printf("\033[0;32m%s: Match!\n\033[0m", listen_buffer);
                             // Send the number of emails first
-                            ssize_t send_status = send(client_socketFD, &entry.mail_count, sizeof(entry.mail_count), 0);
+                            ssize_t send_status = send(client_socketFD, &entry->mail_count, sizeof(entry->mail_count), 0);
                             if (send_status < 0) {
                                 perror("Sending mail count failed");
                                 free_email(received_email);
                                 break;
                             }
                             // Create a copy of the mailing queue
-                            Mail mailing_queue_copy[entry.mail_count];
-                            memcpy(mailing_queue_copy, entry.mailing_queue, entry.mail_count * sizeof(Mail));
+                            Mail mailing_queue_copy[entry->mail_count];
+                            memcpy(mailing_queue_copy, entry->mailing_queue, entry->mail_count * sizeof(Mail));
                             // Send the entire mailing queue
-                            send_status = send(client_socketFD, mailing_queue_copy, entry.mail_count * sizeof(Mail), 0);
+                            send_status = send(client_socketFD, mailing_queue_copy, entry->mail_count * sizeof(Mail), 0);
                             if (send_status < 0) {
                                 perror("Sending mailing queue failed");
                                 free_email(received_email);
