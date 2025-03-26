@@ -1,0 +1,8 @@
+#!/bin/bash
+directory="/mnt/d/LEETCODE/LEARN/C/C_Mail_Server/mail_transfer_agent"
+cd $directory || exit 1
+make clean
+make 
+clear
+./mail_transfer_agent
+chmod +x start_mta

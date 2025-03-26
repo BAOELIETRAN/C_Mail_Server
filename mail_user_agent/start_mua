@@ -5,5 +5,4 @@ make clean
 make 
 clear
 ./mail_user_agent
-chmod +x start
-
+chmod +x start_mua
