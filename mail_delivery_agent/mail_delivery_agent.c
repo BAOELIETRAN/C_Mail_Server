@@ -205,6 +205,8 @@ void* receive_and_push_incoming_data(void *arg){
                 */
                 bool is_entry_exist = false;
                 Mail mail_copy = *received_email;
+                printf("Mail receiver: %s\n", mail_copy.header.receiver);
+                trim_whitespace(mail_copy.header.receiver);
                 pthread_mutex_lock(&waiting_mutex);
                 for (int index = 0; index < entry_counting; index ++){
                     User_Mail_List* entry = &waiting_mail_array[index];

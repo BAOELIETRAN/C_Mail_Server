@@ -39,10 +39,6 @@ Mail* MDA_array = NULL;
         - When start the program, each part will start up and connect to each other
         through sockets
         - Sent message --> MSA --> MTA --> "sent successfully".
-    TODO: 
-        - THE COMMAND BETWEEN SERVERS NEED TO BE CAPITALIZED
-        - Decide the IP address and port for each server (MSA, MTA, MDA)
-    FIX (for send email socket):
         - Login: email and password
         - Correct --> terminal
             - the sender of the mail will be fixed with the logged in email
@@ -54,6 +50,11 @@ Mail* MDA_array = NULL;
         - after printing adios, wait for a while, then print fomdj, and do nothing
         (being blocked?).
         (if MDA match email --> sleep 5 seconds --> send number)
+    TODO: 
+        - THE COMMAND BETWEEN SERVERS NEED TO BE CAPITALIZED
+        - Decide the IP address and port for each server (MSA, MTA, MDA)
+    FIX:
+        - list receive for the first time works fine, but fails on the second time
 */
 
 /*
@@ -768,6 +769,7 @@ void spawn_terminal(){
                 /*
                     array of received email
                 */
+                free(MDA_array);
                 MDA_array = (Mail*)malloc(BUFFER_SIZE * sizeof(Mail));
                 ssize_t send_status = send(get_mail_socket_FD, logged_in_email, strlen(logged_in_email), 0);
                 if (send_status < 0){
@@ -840,24 +842,26 @@ void spawn_terminal(){
                     // close(get_mail_socket_FD);
                     continue;
                 }
+                cur_recv_index = email_count;
+                // If cur_recv_index is greater than or equal to BUFFER_SIZE, we need to reallocate
+                if (cur_recv_index >= BUFFER_SIZE) {
+                    Mail** temp_arr = (Mail**)realloc(recv_arr, 2 * BUFFER_SIZE * sizeof(Mail*));
+                    if (temp_arr == NULL) {
+                        perror("Allocate memory for send array unsuccessfully");
+                        cur_recv_index --;
+                        free(MDA_array);
+                        close(get_mail_socket_FD);
+                        break;
+                    }
+                    recv_arr = temp_arr;
+                }
                 for (int i = 0; i < email_count; i ++){
-                    //segfault since MDA free --> recv_arr point to null
+                    //first segfault since MDA free --> recv_arr point to null
+                    recv_arr[i] = NULL;
                     recv_arr[i] = &MDA_array[i];
                     // print_email(&MDA_array[i]);
                     printf("amigos\n");
-                    cur_recv_index ++;
-                    // If cur_recv_index is greater than or equal to BUFFER_SIZE, we need to reallocate
-                    if (cur_recv_index >= BUFFER_SIZE) {
-                        Mail** temp_arr = (Mail**)realloc(recv_arr, 2 * BUFFER_SIZE * sizeof(Mail*));
-                        if (temp_arr == NULL) {
-                            perror("Allocate memory for send array unsuccessfully");
-                            cur_recv_index --;
-                            free(MDA_array);
-                            close(get_mail_socket_FD);
-                            break;
-                        }
-                        recv_arr = temp_arr;
-                    }
+                    //cur index increase incorrectly --> lead to second segment fault
                 }  
             }
             else{
@@ -1049,7 +1053,7 @@ int main(int argc, char* argv[]){
         close(send_mail_socket_FD);
         exit(EXIT_FAILURE);
     }
-    printf("Connection is successful!\n");
+    printf("Connection to MSA is successful!\n");
     /*
         socket to connect to MDA server
     */
@@ -1068,14 +1072,18 @@ int main(int argc, char* argv[]){
         close(get_mail_socket_FD);
         exit(EXIT_FAILURE);
     }
-    printf("Connection is successful!\n");
+    printf("Connection to MDA is successful!\n");
     spawn_terminal();
     /*
         check lại xem các condition đã đủ chưa
         exit có bị leak memory ko
     */
+    for (int i = 0; i < cur_recv_index; i ++){
+        print_email(&MDA_array[i]);
+    }
     free_arrs();
-    free(MDA_array);
+
+    // free(MDA_array);
     close(send_mail_socket_FD);
     close(get_mail_socket_FD);
     return 0;
